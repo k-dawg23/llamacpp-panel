@@ -9,9 +9,12 @@ from pydantic import BaseModel
 
 
 class GpuDevice(BaseModel):
+    """id uses `gpu:{index}` from nvidia-smi so one pick maps to CUDA and Vulkan."""
+
     id: str
     name: str
     vendor: str
+    uuid: str = ""
 
 
 class GpuListResult(BaseModel):
@@ -30,9 +33,8 @@ def parse_nvidia_smi_csv(output: str) -> list[GpuDevice]:
         index, uuid, name = row[0].strip(), row[1].strip(), row[2].strip()
         if not name:
             continue
-        stable = uuid if uuid else index
-        dev_id = f"cuda:{stable}"
-        devices.append(GpuDevice(id=dev_id, name=name, vendor="NVIDIA"))
+        dev_id = f"gpu:{index}"
+        devices.append(GpuDevice(id=dev_id, name=name, vendor="NVIDIA", uuid=uuid))
     return devices
 
 
@@ -80,14 +82,30 @@ def enumerate_gpus() -> GpuListResult:
 
 
 def apply_gpu_device_to_env(env: dict[str, str], gpu_device_id: str) -> None:
-    """Restrict visible GPU(s) for the child process (CUDA or Vulkan per id prefix)."""
+    """Restrict visible GPU(s) for the child process.
+
+    - ``vk:N`` → ``GGML_VK_VISIBLE_DEVICES`` only (Vulkan builds).
+    - ``gpu:N`` from our enumerator → ``CUDA_VISIBLE_DEVICES`` and ``GGML_VK_VISIBLE_DEVICES``
+      (NVIDIA index usually matches Vulkan device order for discrete GPUs; use ``vk:`` if not).
+    - ``cuda:…`` → ``CUDA_VISIBLE_DEVICES``; if the value is a plain integer, also set Vulkan
+      (legacy); UUID-only selections affect CUDA only.
+    """
     raw = (gpu_device_id or "").strip()
     if not raw:
         return
-    key_lower = raw.lower()
-    if key_lower.startswith("vk:"):
+    lk = raw.lower()
+    if lk.startswith("vk:"):
         env["GGML_VK_VISIBLE_DEVICES"] = raw[3:].strip()
         return
-    cuda_val = raw[5:].strip() if key_lower.startswith("cuda:") else raw
-    if cuda_val:
-        env["CUDA_VISIBLE_DEVICES"] = cuda_val
+    val: str
+    if lk.startswith("gpu:"):
+        val = raw[4:].strip()
+    elif lk.startswith("cuda:"):
+        val = raw[5:].strip()
+    else:
+        val = raw
+    if not val:
+        return
+    env["CUDA_VISIBLE_DEVICES"] = val
+    if val.isdigit():
+        env["GGML_VK_VISIBLE_DEVICES"] = val

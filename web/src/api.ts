@@ -23,7 +23,12 @@ export type AppConfig = {
   launch_profile: LaunchProfile;
 };
 
-export type GpuDevice = { id: string; name: string; vendor: string };
+export type GpuDevice = {
+  id: string;
+  name: string;
+  vendor: string;
+  uuid?: string | null;
+};
 
 export async function getMeta(): Promise<{ version: string }> {
   const r = await fetch(api("/api/meta"));

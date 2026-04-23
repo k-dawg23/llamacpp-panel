@@ -13,20 +13,35 @@ def test_parse_nvidia_smi_csv() -> None:
     devices = parse_nvidia_smi_csv(sample)
     assert len(devices) == 2
     assert devices[0].vendor == "NVIDIA"
-    assert devices[0].id == "cuda:GPU-1111-2222-3333"
+    assert devices[0].id == "gpu:0"
+    assert devices[0].uuid == "GPU-1111-2222-3333"
     assert "4090" in devices[0].name
-    assert devices[1].id == "cuda:GPU-aaaa-bbbb-cccc"
+    assert devices[1].id == "gpu:1"
 
 
-def test_apply_gpu_cuda_prefix() -> None:
+def test_apply_gpu_prefix_sets_cuda_and_vulkan() -> None:
+    env: dict[str, str] = {}
+    apply_gpu_device_to_env(env, "gpu:1")
+    assert env.get("CUDA_VISIBLE_DEVICES") == "1"
+    assert env.get("GGML_VK_VISIBLE_DEVICES") == "1"
+
+
+def test_apply_gpu_cuda_uuid_cuda_only() -> None:
     env: dict[str, str] = {}
     apply_gpu_device_to_env(env, "cuda:GPU-xyz")
     assert env.get("CUDA_VISIBLE_DEVICES") == "GPU-xyz"
     assert "GGML_VK_VISIBLE_DEVICES" not in env
 
 
+def test_apply_cuda_numeric_sets_both() -> None:
+    env: dict[str, str] = {}
+    apply_gpu_device_to_env(env, "cuda:0")
+    assert env.get("CUDA_VISIBLE_DEVICES") == "0"
+    assert env.get("GGML_VK_VISIBLE_DEVICES") == "0"
+
+
 def test_apply_gpu_vk_prefix() -> None:
-    env = {}
+    env: dict[str, str] = {}
     apply_gpu_device_to_env(env, "vk:1")
     assert env.get("GGML_VK_VISIBLE_DEVICES") == "1"
     assert "CUDA_VISIBLE_DEVICES" not in env

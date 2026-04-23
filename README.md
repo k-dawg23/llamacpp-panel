@@ -58,12 +58,14 @@ Hugging Face downloads use the standard cache via `huggingface_hub` (login with 
 
 ## Multi-GPU (NVIDIA)
 
-The panel can list NVIDIA GPUs via `nvidia-smi` and save a **GPU device** on the launch profile. When you start `llama-server`, the supervisor sets:
+The panel lists NVIDIA GPUs via `nvidia-smi` using each card’s **driver index** (`gpu:0`, `gpu:1`, …). When you start `llama-server`, the supervisor sets:
 
-- **`CUDA_VISIBLE_DEVICES`** for IDs returned from detection (stored as `cuda:…`, for example `cuda:GPU-uuid` or `cuda:0` after normalization).
-- **`GGML_VK_VISIBLE_DEVICES`** only if you enter an id of the form **`vk:N`** (manual Vulkan device index). Vulkan builds do not yet get automatic enumeration here.
+- **`CUDA_VISIBLE_DEVICES`** to that index (or UUID) for CUDA builds.
+- **`GGML_VK_VISIBLE_DEVICES`** to the **same index** when the saved value is numeric (covers typical **Vulkan** tarballs on multi‑GPU NVIDIA boxes). Vulkan and CUDA device order usually match for discrete GPUs; if not, set a manual **`vk:N`** id (Vulkan only) after checking `vulkaninfo` / `llama-server --list-devices` for your build.
 
-If `nvidia-smi` is missing (typical for Vulkan-only or CPU machines), the list is empty and inference still works as before; you can leave the device as **Default** or set a manual `vk:` id for Vulkan.
+Older configs may still store `cuda:GPU-…` (UUID); that affects CUDA only—**re-pick the GPU** in Settings so the profile uses `gpu:N` and Vulkan sees a single device.
+
+If `nvidia-smi` is missing, use **Default** or a manual **`vk:N`** line in the GPU field.
 
 ## Tests
 

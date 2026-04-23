@@ -402,6 +402,11 @@ export default function App() {
                   {gpus.map((g) => (
                     <li key={g.id}>
                       <code>{g.id}</code> — {g.name}
+                      {g.uuid ? (
+                        <span style={{ display: "block", fontSize: 12, opacity: 0.85 }}>
+                          UUID {g.uuid}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -427,7 +432,7 @@ export default function App() {
                   </select>
                 </Field>
               ) : (
-                <Field label="GPU device id (optional, e.g. vk:0 or cuda:GPU-…)">
+                <Field label="GPU device id (optional, e.g. gpu:1 or vk:0)">
                   <input
                     value={gpuId}
                     style={inputStyle}
