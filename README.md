@@ -48,6 +48,10 @@ cd web && npm run dev
 
 Open `http://127.0.0.1:5173` — Vite proxies `/api` to port 8742.
 
+## User guide
+
+In-app **Help** tab (after `npm run build`) mirrors [`docs/panel-user-guide.md`](docs/panel-user-guide.md): every tab, field, and primary action explained.
+
 ## Configuration
 
 - **Bundle directory:** folder containing `llama-server` (for example an unpacked release). The supervisor prepends this directory to `LD_LIBRARY_PATH` for the child process only.

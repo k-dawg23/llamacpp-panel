@@ -1,5 +1,15 @@
-import type { CSSProperties, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { HelpPanel } from "./HelpPanel";
 import type { AppConfig, GpuDevice, LaunchProfile } from "./api";
 import {
   getConfig,
@@ -22,6 +32,79 @@ const presets: Record<string, Partial<LaunchProfile>> = {
   quality: { ctx_size: 32768, n_gpu_layers: 99, enable_metrics: true },
 };
 
+type TabKey = "settings" | "models" | "server" | "monitor" | "help";
+
+const TAB_ROWS: { key: TabKey; label: string; hint: string }[] = [
+  {
+    key: "settings",
+    label: "Settings",
+    hint: "llama-server binary path, model roots, launch profile (context, GPU, model path), and presets.",
+  },
+  {
+    key: "models",
+    label: "Models",
+    hint: "Scan GGUF files under model roots, set the active model, and start Hugging Face downloads.",
+  },
+  {
+    key: "server",
+    label: "Server",
+    hint: "Start or stop supervised llama-server and view live process logs.",
+  },
+  {
+    key: "monitor",
+    label: "Monitor",
+    hint: "Poll the llama-server HTTP API for health, props, slots, and metrics.",
+  },
+  {
+    key: "help",
+    label: "Help",
+    hint: "Full user guide: fields, tabs, and tips (same content as docs/panel-user-guide.md).",
+  },
+];
+
+function launchProfileMatchesPreset(lp: LaunchProfile, presetName: string): boolean {
+  const p = presets[presetName];
+  if (!p) return false;
+  return (Object.keys(p) as (keyof LaunchProfile)[]).every((k) => lp[k] === p[k]);
+}
+
+function tabButtonStyle(active: boolean): CSSProperties {
+  return {
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: active ? "2px solid #5a8fd4" : "1px solid #2a3142",
+    background: active ? "#2a3355" : "#151821",
+    color: "#e8eaed",
+    fontWeight: active ? 600 : 400,
+    boxShadow: active ? "inset 0 0 0 1px rgba(90, 143, 212, 0.25)" : "none",
+    cursor: "pointer",
+  };
+}
+
+function presetToggleStyle(active: boolean): CSSProperties {
+  return {
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: active ? "2px solid #5a8fd4" : "1px solid #2a3142",
+    background: active ? "#252b48" : "#151821",
+    color: "#e8eaed",
+    fontWeight: active ? 600 : 400,
+    cursor: "pointer",
+  };
+}
+
+const srOnly: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0,0,0,0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
   const u = ["KB", "MB", "GB", "TB"];
@@ -38,7 +121,7 @@ export default function App() {
   const [cfg, setCfg] = useState<AppConfig | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"settings" | "models" | "server" | "monitor">("settings");
+  const [tab, setTab] = useState<TabKey>("settings");
   const [validation, setValidation] = useState<Record<string, unknown> | null>(null);
   const [models, setModels] = useState<{ path: string; size_bytes: number; mtime: number }[]>(
     [],
@@ -226,26 +309,22 @@ export default function App() {
         </p>
       </header>
 
-      <nav style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {(
-          [
-            ["settings", "Settings"],
-            ["models", "Models"],
-            ["server", "Server"],
-            ["monitor", "Monitor"],
-          ] as const
-        ).map(([k, label]) => (
+      <nav
+        role="tablist"
+        aria-label="Main sections"
+        style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}
+      >
+        {TAB_ROWS.map(({ key: k, label, hint }) => (
           <button
             key={k}
             type="button"
+            role="tab"
+            id={`tab-${k}`}
+            aria-selected={tab === k}
+            aria-controls={`panel-${k}`}
+            title={hint}
             onClick={() => setTab(k)}
-            style={{
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "1px solid #2a3142",
-              background: tab === k ? "#2c3350" : "#151821",
-              color: "#e8eaed",
-            }}
+            style={tabButtonStyle(tab === k)}
           >
             {label}
           </button>
@@ -260,10 +339,17 @@ export default function App() {
       )}
 
       {tab === "settings" && (
-        <div style={stylePanel}>
+        <div
+          style={stylePanel}
+          role="tabpanel"
+          id="panel-settings"
+          aria-labelledby="tab-settings"
+        >
           <h2 style={{ marginTop: 0 }}>Paths and supervisor</h2>
           <label style={{ display: "block", marginBottom: 8 }}>
-            <div style={{ color: "#9aa3b5", fontSize: 13 }}>llama.cpp bundle directory</div>
+            <div style={{ color: "#9aa3b5", fontSize: 13 }} title="Folder containing llama-server and usually .so files for portable builds.">
+              llama.cpp bundle directory
+            </div>
             <input
               style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #2a3142", background: "#0e1016", color: "#e8eaed" }}
               value={cfg.llama_bin_dir}
@@ -271,7 +357,12 @@ export default function App() {
                 setCfg({ ...cfg, llama_bin_dir: e.target.value })
               }
               placeholder="/path/to/llama-b8882"
+              title="Absolute path to the directory with the llama-server executable."
+              aria-describedby="hint-bundle-dir"
             />
+            <span id="hint-bundle-dir" style={srOnly}>
+              Absolute path to the directory with the llama-server executable (Vulkan/CUDA bundle).
+            </span>
           </label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
             <button
@@ -279,10 +370,16 @@ export default function App() {
               disabled={busy}
               onClick={() => savePartial({ llama_bin_dir: cfg.llama_bin_dir })}
               style={btn}
+              title="Write the bundle directory to saved configuration."
             >
               Save path
             </button>
-            <button type="button" onClick={onValidate} style={btn}>
+            <button
+              type="button"
+              onClick={onValidate}
+              style={btn}
+              title="Check that llama-server exists at the resolved path and is executable."
+            >
               Validate binary
             </button>
           </div>
@@ -293,7 +390,9 @@ export default function App() {
           )}
 
           <label style={{ display: "block", marginTop: 16 }}>
-            <div style={{ color: "#9aa3b5", fontSize: 13 }}>Model roots (one per line)</div>
+            <div style={{ color: "#9aa3b5", fontSize: 13 }} title="Directories scanned for .gguf when you click Scan GGUF on the Models tab.">
+              Model roots (one per line)
+            </div>
             <textarea
               style={{ width: "100%", minHeight: 80, padding: 8, borderRadius: 6, border: "1px solid #2a3142", background: "#0e1016", color: "#e8eaed" }}
               value={cfg.model_roots.join("\n")}
@@ -303,20 +402,29 @@ export default function App() {
                   model_roots: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
                 })
               }
+              title="One absolute path per line; used by Models → Scan GGUF."
+              aria-describedby="hint-model-roots"
             />
+            <span id="hint-model-roots" style={srOnly}>
+              One directory per line. The Models tab scans these paths for GGUF files.
+            </span>
           </label>
           <button
             type="button"
             disabled={busy}
             onClick={() => savePartial({ model_roots: cfg.model_roots })}
             style={{ ...btn, marginTop: 8 }}
+            title="Persist model root directories to configuration."
           >
             Save model roots
           </button>
 
           <h3>Launch profile</h3>
           <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
-            <Field label="Model mode">
+            <Field
+              label="Model mode"
+              hint="local: path to a .gguf file (-m). hf: Hugging Face repo id (-hf) if your build supports it."
+            >
               <select
                 value={lp.model_mode}
                 onChange={(e) =>
@@ -334,7 +442,10 @@ export default function App() {
                 <option value="hf">Hugging Face (-hf)</option>
               </select>
             </Field>
-            <Field label="Server host">
+            <Field
+              label="Server host"
+              hint="HTTP bind address for llama-server (127.0.0.1 for local only; 0.0.0.0 exposes all interfaces)."
+            >
               <input
                 value={lp.server_host}
                 onChange={(e) =>
@@ -346,7 +457,10 @@ export default function App() {
                 style={inputStyle}
               />
             </Field>
-            <Field label="Server port">
+            <Field
+              label="Server port"
+              hint="TCP port for the llama-server HTTP API (e.g. 8080). Must be free on the host."
+            >
               <input
                 type="number"
                 value={lp.server_port}
@@ -359,7 +473,10 @@ export default function App() {
                 style={inputStyle}
               />
             </Field>
-            <Field label="Context (-c)">
+            <Field
+              label="Context (-c)"
+              hint="Context length in tokens. Lower if you hit OOM; upper bound depends on model and hardware."
+            >
               <input
                 type="number"
                 value={lp.ctx_size}
@@ -372,7 +489,10 @@ export default function App() {
                 style={inputStyle}
               />
             </Field>
-            <Field label="GPU layers (-ngl)">
+            <Field
+              label="GPU layers (-ngl)"
+              hint="Layers on GPU; 0 = CPU offload for GPU builds. 99 often means all layers—see llama-server --help."
+            >
               <input
                 type="number"
                 value={lp.n_gpu_layers}
@@ -393,7 +513,12 @@ export default function App() {
                   : gpuMessage || "No NVIDIA GPUs enumerated (nvidia-smi missing or none found). Vulkan builds may use a manual id such as vk:0."}
               </p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                <button type="button" style={btn} onClick={() => void refreshGpus()}>
+                <button
+                  type="button"
+                  style={btn}
+                  title="Re-run GPU discovery (nvidia-smi when available)."
+                  onClick={() => void refreshGpus()}
+                >
                   Refresh GPU list
                 </button>
               </div>
@@ -412,7 +537,10 @@ export default function App() {
                 </ul>
               )}
               {gpus.length > 1 ? (
-                <Field label="Use GPU for next launch">
+                <Field
+                  label="Use GPU for next launch"
+                  hint="Restricts visible GPUs for the next start (CUDA and Vulkan indices when numeric, e.g. gpu:1). Empty = all visible."
+                >
                   <select
                     value={gpuId}
                     style={inputStyle}
@@ -432,7 +560,10 @@ export default function App() {
                   </select>
                 </Field>
               ) : (
-                <Field label="GPU device id (optional, e.g. gpu:1 or vk:0)">
+                <Field
+                  label="GPU device id (optional, e.g. gpu:1 or vk:0)"
+                  hint="Manual id when auto-detection is missing: gpu:N for NVIDIA index, vk:N for Vulkan-only override. Leave empty for default."
+                >
                   <input
                     value={gpuId}
                     style={inputStyle}
@@ -447,7 +578,10 @@ export default function App() {
                 </Field>
               )}
             </div>
-            <Field label="API key (--api-key)">
+            <Field
+              label="API key (--api-key)"
+              hint="Optional secret passed to llama-server. Recommended if you bind to non-loopback addresses."
+            >
               <input
                 type="password"
                 value={lp.api_key}
@@ -462,7 +596,10 @@ export default function App() {
               />
             </Field>
           </div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+          <label
+            style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}
+            title="Exposes server metrics endpoints when your llama-server build supports --metrics."
+          >
             <input
               type="checkbox"
               checked={lp.enable_metrics}
@@ -475,7 +612,14 @@ export default function App() {
             />
             Enable <code>--metrics</code>
           </label>
-          <Field label={lp.model_mode === "local" ? "Local model path (-m)" : "HF repo (-hf)"}>
+          <Field
+            label={lp.model_mode === "local" ? "Local model path (-m)" : "HF repo (-hf)"}
+            hint={
+              lp.model_mode === "local"
+                ? "Absolute path to the .gguf file used on server start."
+                : "Hugging Face repository id (org/name) for -hf mode."
+            }
+          >
             <input
               value={lp.model_mode === "local" ? lp.local_model_path : lp.hf_repo}
               onChange={(e) =>
@@ -490,7 +634,10 @@ export default function App() {
               style={{ ...inputStyle, width: "100%" }}
             />
           </Field>
-          <Field label="Extra args (shell-quoted)">
+          <Field
+            label="Extra args (shell-quoted)"
+            hint="Additional tokens appended to llama-server (e.g. --threads 8). Quoting rules match the supervisor implementation."
+          >
             <input
               value={lp.extra_args}
               onChange={(e) =>
@@ -504,16 +651,29 @@ export default function App() {
             />
           </Field>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-            <span style={{ color: "#9aa3b5", alignSelf: "center" }}>Presets:</span>
-            {Object.keys(presets).map((k) => (
-              <button key={k} type="button" style={btn} onClick={() => applyPreset(k)}>
-                {k}
-              </button>
-            ))}
+            <span style={{ color: "#9aa3b5", alignSelf: "center" }} title="Apply starter values for context, GPU layers, and metrics. You still need Save launch profile.">
+              Presets:
+            </span>
+            {Object.keys(presets).map((k) => {
+              const active = launchProfileMatchesPreset(lp, k);
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={active}
+                  title={`Apply ${k} preset (context / GPU layers). Does not save until you click Save launch profile.`}
+                  style={presetToggleStyle(active)}
+                  onClick={() => applyPreset(k)}
+                >
+                  {k}
+                </button>
+              );
+            })}
             <button
               type="button"
               disabled={busy}
               style={btnPrimary}
+              title="Persist the launch profile fields to disk for the next server start."
               onClick={() => savePartial({ launch_profile: lp })}
             >
               Save launch profile
@@ -528,7 +688,7 @@ export default function App() {
       )}
 
       {tab === "models" && (
-        <div style={stylePanel}>
+        <div style={stylePanel} role="tabpanel" id="panel-models" aria-labelledby="tab-models">
           <h2 style={{ marginTop: 0 }}>Model library</h2>
           <div
             style={{
@@ -548,7 +708,12 @@ export default function App() {
             <div style={{ fontSize: 12, color: "#9aa3b5", marginTop: 6 }}>Mode: {lp.model_mode}</div>
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button type="button" style={btn} onClick={refreshModels}>
+            <button
+              type="button"
+              style={btn}
+              title="List .gguf files under configured model roots (Settings)."
+              onClick={refreshModels}
+            >
               Scan GGUF
             </button>
           </div>
@@ -580,6 +745,12 @@ export default function App() {
                       <button
                         type="button"
                         style={btnSmall}
+                        aria-pressed={active}
+                        title={
+                          active
+                            ? "This row is the active local model for the next server start."
+                            : "Set this GGUF as the local model and save the launch profile."
+                        }
                         onClick={() => {
                           setCfg({
                             ...cfg,
@@ -610,16 +781,17 @@ export default function App() {
 
           <h3>Hugging Face download</h3>
           <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
-            <Field label="Repo id">
+            <Field label="Repo id" hint="Hugging Face repository id, e.g. TheBloke/Llama-2-7B-GGUF.">
               <input value={hfRepo} onChange={(e) => setHfRepo(e.target.value)} style={inputStyle} placeholder="org/repo" />
             </Field>
-            <Field label="Filename in repo">
+            <Field label="Filename in repo" hint="Exact GGUF filename inside the repo to download.">
               <input value={hfFile} onChange={(e) => setHfFile(e.target.value)} style={inputStyle} placeholder="model-Q4_K_M.gguf" />
             </Field>
           </div>
           <button
             type="button"
             style={btnPrimary}
+            title="Queue a background download via huggingface_hub; status appears below."
             onClick={async () => {
               setErr(null);
               try {
@@ -641,7 +813,7 @@ export default function App() {
       )}
 
       {tab === "server" && (
-        <div style={stylePanel}>
+        <div style={stylePanel} role="tabpanel" id="panel-server" aria-labelledby="tab-server">
           <h2 style={{ marginTop: 0 }}>Operations</h2>
           <p>
             Status:{" "}
@@ -653,6 +825,7 @@ export default function App() {
               type="button"
               style={btnPrimary}
               disabled={busy || !!sup?.running}
+              title="Spawn llama-server with the saved launch profile and bundle library path."
               onClick={async () => {
                 setBusy(true);
                 setErr(null);
@@ -672,6 +845,7 @@ export default function App() {
               type="button"
               style={btn}
               disabled={busy || !sup?.running}
+              title="Stop the supervised llama-server process (SIGTERM)."
               onClick={async () => {
                 setBusy(true);
                 setErr(null);
@@ -707,7 +881,7 @@ export default function App() {
       )}
 
       {tab === "monitor" && (
-        <div style={stylePanel}>
+        <div style={stylePanel} role="tabpanel" id="panel-monitor" aria-labelledby="tab-monitor">
           <h2 style={{ marginTop: 0 }}>llama-server HTTP</h2>
           <p style={{ color: "#9aa3b5" }}>
             Polling <code>
@@ -736,6 +910,16 @@ export default function App() {
         </div>
       )}
 
+      {tab === "help" && (
+        <div style={stylePanel} role="tabpanel" id="panel-help" aria-labelledby="tab-help">
+          <h2 style={{ marginTop: 0 }}>User guide</h2>
+          <p style={{ marginTop: 0, color: "#9aa3b5", fontSize: 14 }}>
+            Same content as <code>docs/panel-user-guide.md</code> in the repository. For the latest after an upgrade, rebuild the web UI or open the file on disk.
+          </p>
+          <HelpPanel />
+        </div>
+      )}
+
       <footer style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #2a3142", color: "#6b7280", fontSize: 13 }}>
         llamacpp-panel{appVersion ? ` v${appVersion}` : ""}
       </footer>
@@ -743,11 +927,35 @@ export default function App() {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const descId = hint ? `${id}-hint` : undefined;
+  const control =
+    hint && isValidElement(children)
+      ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+          title: hint,
+          "aria-describedby": descId,
+        })
+      : children;
   return (
     <label style={{ display: "block" }}>
-      <div style={{ color: "#9aa3b5", fontSize: 13 }}>{label}</div>
-      {children}
+      <div style={{ color: "#9aa3b5", fontSize: 13 }} title={hint}>
+        {label}
+      </div>
+      {hint ? (
+        <span id={descId} style={srOnly}>
+          {hint}
+        </span>
+      ) : null}
+      {control}
     </label>
   );
 }
