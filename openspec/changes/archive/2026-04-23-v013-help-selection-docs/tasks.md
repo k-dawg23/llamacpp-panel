@@ -2,7 +2,7 @@
 
 - [x] 1.1 Bump `pyproject.toml` and `llamacpp_panel/__init__.py` version to **0.1.3**
 - [x] 1.2 Surface version **0.1.3** in the web UI (footer or about line)
-- [ ] 1.3 After merge, create and push git tag **`v0.1.3`** (and optional GitHub release notes)
+- [x] 1.3 After merge, create and push git tag **`v0.1.3`** (and optional GitHub release notes)
 
 ## 2. User guide Markdown
 
@@ -30,5 +30,5 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Manual pass: every tab shows clear active state; hints appear on hover/focus; Help tab matches guide content
+- [x] 6.1 Manual pass: every tab shows clear active state; hints appear on hover/focus; Help tab matches guide content
 - [x] 6.2 `npm run build` succeeds; optional smoke test for bundle including the guide
