@@ -63,6 +63,10 @@ source .venv/bin/activate
 pytest
 ```
 
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 ## Git
 
 This repository is intended to be used with Git for version control (`git init` / clone as usual).
