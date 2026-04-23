@@ -56,6 +56,15 @@ Open `http://127.0.0.1:5173` — Vite proxies `/api` to port 8742.
 
 Hugging Face downloads use the standard cache via `huggingface_hub` (login with `huggingface-cli login` if a repo is gated).
 
+## Multi-GPU (NVIDIA)
+
+The panel can list NVIDIA GPUs via `nvidia-smi` and save a **GPU device** on the launch profile. When you start `llama-server`, the supervisor sets:
+
+- **`CUDA_VISIBLE_DEVICES`** for IDs returned from detection (stored as `cuda:…`, for example `cuda:GPU-uuid` or `cuda:0` after normalization).
+- **`GGML_VK_VISIBLE_DEVICES`** only if you enter an id of the form **`vk:N`** (manual Vulkan device index). Vulkan builds do not yet get automatic enumeration here.
+
+If `nvidia-smi` is missing (typical for Vulkan-only or CPU machines), the list is empty and inference still works as before; you can leave the device as **Default** or set a manual `vk:` id for Vulkan.
+
 ## Tests
 
 ```bash

@@ -1,10 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppConfig, LaunchProfile } from "./api";
+import type { AppConfig, GpuDevice, LaunchProfile } from "./api";
 import {
   getConfig,
+  getMeta,
   hfDownload,
   hfJob,
+  listGpus,
   listLocalModels,
   monitorStatus,
   putConfig,
@@ -51,6 +53,11 @@ export default function App() {
   const [hfJobId, setHfJobId] = useState<string | null>(null);
   const [hfJobStatus, setHfJobStatus] = useState<Record<string, unknown> | null>(null);
 
+  const [appVersion, setAppVersion] = useState<string>("");
+  const [gpus, setGpus] = useState<GpuDevice[]>([]);
+  const [gpuSource, setGpuSource] = useState<string>("none");
+  const [gpuMessage, setGpuMessage] = useState<string>("");
+
   const refresh = useCallback(async () => {
     setErr(null);
     const c = await getConfig();
@@ -60,6 +67,31 @@ export default function App() {
   useEffect(() => {
     refresh().catch((e) => setErr(String(e)));
   }, [refresh]);
+
+  useEffect(() => {
+    getMeta()
+      .then((m) => setAppVersion(m.version))
+      .catch(() => setAppVersion(""));
+  }, []);
+
+  const refreshGpus = useCallback(async () => {
+    try {
+      const r = await listGpus();
+      setGpus(r.devices);
+      setGpuSource(r.source);
+      setGpuMessage(r.message || "");
+    } catch {
+      setGpus([]);
+      setGpuSource("none");
+      setGpuMessage("Could not query GPUs");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "settings") {
+      void refreshGpus();
+    }
+  }, [tab, refreshGpus]);
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -119,6 +151,7 @@ export default function App() {
   }, [hfJobId]);
 
   const lp = cfg?.launch_profile;
+  const gpuId = lp?.gpu_device_id ?? "";
 
   const savePartial = async (partial: Partial<AppConfig>) => {
     if (!cfg) return;
@@ -352,6 +385,63 @@ export default function App() {
                 style={inputStyle}
               />
             </Field>
+            <div style={{ gridColumn: "1 / -1", marginTop: 4 }}>
+              <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>GPU device</h3>
+              <p style={{ margin: "0 0 8px", color: "#9aa3b5", fontSize: 13 }}>
+                {gpuSource !== "none"
+                  ? `Detected via ${gpuSource} (${gpus.length} device(s)).`
+                  : gpuMessage || "No NVIDIA GPUs enumerated (nvidia-smi missing or none found). Vulkan builds may use a manual id such as vk:0."}
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                <button type="button" style={btn} onClick={() => void refreshGpus()}>
+                  Refresh GPU list
+                </button>
+              </div>
+              {gpus.length > 0 && (
+                <ul style={{ margin: "0 0 8px", paddingLeft: 20, color: "#c5cad6", fontSize: 13 }}>
+                  {gpus.map((g) => (
+                    <li key={g.id}>
+                      <code>{g.id}</code> — {g.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {gpus.length > 1 ? (
+                <Field label="Use GPU for next launch">
+                  <select
+                    value={gpuId}
+                    style={inputStyle}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const nextLp = { ...lp, gpu_device_id: v };
+                      setCfg({ ...cfg, launch_profile: nextLp });
+                      void savePartial({ launch_profile: nextLp });
+                    }}
+                  >
+                    <option value="">Default (all visible)</option>
+                    {gpus.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                <Field label="GPU device id (optional, e.g. vk:0 or cuda:GPU-…)">
+                  <input
+                    value={gpuId}
+                    style={inputStyle}
+                    placeholder="Leave empty for default"
+                    onChange={(e) =>
+                      setCfg({
+                        ...cfg,
+                        launch_profile: { ...lp, gpu_device_id: e.target.value },
+                      })
+                    }
+                  />
+                </Field>
+              )}
+            </div>
             <Field label="API key (--api-key)">
               <input
                 type="password"
@@ -435,6 +525,23 @@ export default function App() {
       {tab === "models" && (
         <div style={stylePanel}>
           <h2 style={{ marginTop: 0 }}>Model library</h2>
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: "1px solid #3d5a9c",
+              background: "#1a2740",
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#9aa3b5", marginBottom: 4 }}>Current model</div>
+            <div style={{ fontWeight: 600, wordBreak: "break-all" }}>
+              {lp.model_mode === "local"
+                ? lp.local_model_path || "— none selected —"
+                : `Hugging Face: ${lp.hf_repo || "— none —"}`}
+            </div>
+            <div style={{ fontSize: 12, color: "#9aa3b5", marginTop: 6 }}>Mode: {lp.model_mode}</div>
+          </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             <button type="button" style={btn} onClick={refreshModels}>
               Scan GGUF
@@ -450,8 +557,18 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {models.map((m) => (
-                  <tr key={m.path}>
+                {models.map((m) => {
+                  const active =
+                    lp.model_mode === "local" && m.path === lp.local_model_path;
+                  return (
+                  <tr
+                    key={m.path}
+                    style={
+                      active
+                        ? { background: "#1e3358", outline: "1px solid #4a7cbc" }
+                        : undefined
+                    }
+                  >
                     <td style={td}><code style={{ wordBreak: "break-all" }}>{m.path}</code></td>
                     <td style={td}>{formatBytes(m.size_bytes)}</td>
                     <td style={td}>
@@ -476,11 +593,12 @@ export default function App() {
                           });
                         }}
                       >
-                        Use
+                        {active ? "Selected" : "Use"}
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -612,6 +730,10 @@ export default function App() {
           )}
         </div>
       )}
+
+      <footer style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #2a3142", color: "#6b7280", fontSize: 13 }}>
+        llamacpp-panel{appVersion ? ` v${appVersion}` : ""}
+      </footer>
     </div>
   );
 }

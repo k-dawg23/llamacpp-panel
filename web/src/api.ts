@@ -11,6 +11,7 @@ export type LaunchProfile = {
   enable_metrics: boolean;
   api_key: string;
   extra_args: string;
+  gpu_device_id: string;
 };
 
 export type AppConfig = {
@@ -21,6 +22,24 @@ export type AppConfig = {
   log_buffer_lines: number;
   launch_profile: LaunchProfile;
 };
+
+export type GpuDevice = { id: string; name: string; vendor: string };
+
+export async function getMeta(): Promise<{ version: string }> {
+  const r = await fetch(api("/api/meta"));
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function listGpus(): Promise<{
+  devices: GpuDevice[];
+  source: string;
+  message: string;
+}> {
+  const r = await fetch(api("/api/hardware/gpus"));
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
 
 export async function getConfig(): Promise<AppConfig> {
   const r = await fetch(api("/api/config"));

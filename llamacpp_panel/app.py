@@ -13,12 +13,14 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from llamacpp_panel import __version__
 from llamacpp_panel.config import (
     AppConfig,
     LaunchProfile,
     default_config_path,
     resolve_llama_server_path,
 )
+from llamacpp_panel.gpu_enumeration import enumerate_gpus
 from llamacpp_panel.hf_download import HfJobManager
 from llamacpp_panel.logs import RingBuffer
 from llamacpp_panel.models_scan import scan_gguf_roots
@@ -82,6 +84,15 @@ def create_app(
     @app.get("/api/config")
     async def get_config() -> dict[str, Any]:
         return state.config.model_dump()
+
+    @app.get("/api/meta")
+    async def meta() -> dict[str, str]:
+        return {"version": __version__}
+
+    @app.get("/api/hardware/gpus")
+    async def hardware_gpus() -> dict[str, Any]:
+        result = enumerate_gpus()
+        return result.model_dump()
 
     @app.put("/api/config")
     async def put_config(payload: ConfigUpdatePayload) -> dict[str, Any]:

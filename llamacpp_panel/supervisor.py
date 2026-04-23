@@ -5,8 +5,10 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
 from llamacpp_panel.args import build_llama_server_argv
 from llamacpp_panel.config import AppConfig, LaunchProfile, resolve_llama_server_path
+from llamacpp_panel.gpu_enumeration import apply_gpu_device_to_env
 from llamacpp_panel.logs import LogBroadcaster, RingBuffer
 
 
@@ -54,6 +56,7 @@ class LlamaSupervisor:
 
         env = os.environ.copy()
         self._prepend_ld_path(env, bin_dir.resolve())
+        apply_gpu_device_to_env(env, profile.gpu_device_id)
 
         self.buffer = RingBuffer(cfg.log_buffer_lines)
         self.state = SupervisedState(running=True, last_error=None)

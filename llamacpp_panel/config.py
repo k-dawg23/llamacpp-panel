@@ -30,6 +30,7 @@ class LaunchProfile(BaseModel):
     enable_metrics: bool = False
     api_key: str = ""
     extra_args: str = ""
+    gpu_device_id: str = ""
 
 
 class AppConfig(BaseModel):
