@@ -26,6 +26,28 @@ from llamacpp_panel.monitoring import fetch_llama_server_status
 from llamacpp_panel.supervisor import LlamaSupervisor
 
 
+class ConfigUpdatePayload(BaseModel):
+    llama_bin_dir: str | None = None
+    supervisor_host: str | None = None
+    supervisor_port: int | None = None
+    model_roots: list[str] | None = None
+    log_buffer_lines: int | None = None
+    launch_profile: dict[str, Any] | None = None
+
+
+class ValidateBinaryPayload(BaseModel):
+    llama_bin_dir: str | None = None
+
+
+class SupervisorStartPayload(BaseModel):
+    launch_profile: dict[str, Any] | None = None
+
+
+class HfDownloadPayload(BaseModel):
+    repo_id: str = Field(..., min_length=1)
+    filename: str = Field(..., min_length=1)
+
+
 class AppState:
     def __init__(self) -> None:
         self.config_path = default_config_path()
@@ -61,18 +83,10 @@ def create_app(
     async def get_config() -> dict[str, Any]:
         return state.config.model_dump()
 
-    class ConfigUpdate(BaseModel):
-        llama_bin_dir: str | None = None
-        supervisor_host: str | None = None
-        supervisor_port: int | None = None
-        model_roots: list[str] | None = None
-        log_buffer_lines: int | None = None
-        launch_profile: dict[str, Any] | None = None
-
     @app.put("/api/config")
-    async def put_config(body: ConfigUpdate) -> dict[str, Any]:
+    async def put_config(payload: ConfigUpdatePayload) -> dict[str, Any]:
         data = state.config.model_dump()
-        patch = body.model_dump(exclude_none=True)
+        patch = payload.model_dump(exclude_none=True)
         if "launch_profile" in patch and patch["launch_profile"] is not None:
             data["launch_profile"] = {**data["launch_profile"], **patch["launch_profile"]}
             del patch["launch_profile"]
@@ -82,12 +96,9 @@ def create_app(
         state.supervisor.buffer = RingBuffer(state.config.log_buffer_lines)
         return state.config.model_dump()
 
-    class ValidateBinaryBody(BaseModel):
-        llama_bin_dir: str | None = None
-
     @app.post("/api/validate-binary")
-    async def validate_binary(body: ValidateBinaryBody) -> dict[str, Any]:
-        d = (body.llama_bin_dir or state.config.llama_bin_dir or "").strip()
+    async def validate_binary(payload: ValidateBinaryPayload) -> dict[str, Any]:
+        d = (payload.llama_bin_dir or state.config.llama_bin_dir or "").strip()
         if not d:
             return {"ok": False, "error": "llama_bin_dir is empty"}
         server = resolve_llama_server_path(d)
@@ -137,14 +148,13 @@ def create_app(
             "last_error": s.last_error,
         }
 
-    class StartBody(BaseModel):
-        launch_profile: dict[str, Any] | None = None
-
     @app.post("/api/supervisor/start")
-    async def supervisor_start(body: StartBody | None = None) -> dict[str, Any]:
+    async def supervisor_start(
+        payload: SupervisorStartPayload | None = None,
+    ) -> dict[str, Any]:
         profile_override: LaunchProfile | None = None
-        if body and body.launch_profile:
-            merged = {**state.config.launch_profile.model_dump(), **body.launch_profile}
+        if payload and payload.launch_profile:
+            merged = {**state.config.launch_profile.model_dump(), **payload.launch_profile}
             profile_override = LaunchProfile.model_validate(merged)
         try:
             await state.supervisor.start(profile_override)
@@ -196,13 +206,9 @@ def create_app(
         entries = await scan_gguf_roots(state.config.model_roots)
         return {"models": [e.model_dump() for e in entries]}
 
-    class HfDownloadBody(BaseModel):
-        repo_id: str = Field(..., min_length=1)
-        filename: str = Field(..., min_length=1)
-
     @app.post("/api/hf/download")
-    async def hf_download(body: HfDownloadBody) -> dict[str, Any]:
-        job = state.hf_jobs.start_download(body.repo_id.strip(), body.filename.strip())
+    async def hf_download(payload: HfDownloadPayload) -> dict[str, Any]:
+        job = state.hf_jobs.start_download(payload.repo_id.strip(), payload.filename.strip())
         return {"job_id": job.id}
 
     @app.get("/api/hf/jobs/{job_id}")
