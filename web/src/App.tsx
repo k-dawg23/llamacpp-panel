@@ -789,18 +789,31 @@ export default function App() {
           </div>
 
           <h3>Hugging Face download</h3>
+          <p style={{ color: "#9aa3b5", fontSize: 13, marginTop: 0, maxWidth: 720, lineHeight: 1.45 }}>
+            Uses Hugging Face <strong>file paths</strong> from the repo&apos;s <strong>Files</strong> tab—not the{" "}
+            <code style={{ fontSize: 12 }}>-hf org/repo:quant</code> shorthand that{" "}
+            <code style={{ fontSize: 12 }}>llama-server</code> accepts. Example: if docs say{" "}
+            <code style={{ fontSize: 12 }}>llama-server -hf unsloth/Qwen3.5-4B-GGUF:UD-Q4_K_XL</code>, enter repo{" "}
+            <code style={{ fontSize: 12 }}>unsloth/Qwen3.5-4B-GGUF</code> and filename{" "}
+            <code style={{ fontSize: 12 }}>Qwen3.5-4B-UD-Q4_K_XL.gguf</code> (the real object name on the Hub).
+          </p>
           <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
             <Field
               label="Repo id"
-              hint="Full id: organization/repository-name (e.g. unsloth/Qwen3.5-4B-GGUF). Not the org name alone—must match the repo URL on huggingface.co."
+              hint="Full id: organization/repository-name (e.g. unsloth/Qwen3.5-4B-GGUF). Must match the model page URL."
             >
               <input value={hfRepo} onChange={(e) => setHfRepo(e.target.value)} style={inputStyle} placeholder="org/model-repo" />
             </Field>
             <Field
               label="Filename in repo"
-              hint="Exact GGUF file name in that repo root (e.g. Qwen3.5-4B-Q4_K_M.gguf). Not a revision or subpath with colons—copy from the Files list on the model page."
+              hint="Exact path/filename in the repo (often ModelName-Quant.gguf). Open Files on huggingface.co and copy the name; colons belong in llama -hf syntax, not here."
             >
-              <input value={hfFile} onChange={(e) => setHfFile(e.target.value)} style={inputStyle} placeholder="model-Q4_K_M.gguf" />
+              <input
+                value={hfFile}
+                onChange={(e) => setHfFile(e.target.value)}
+                style={inputStyle}
+                placeholder="Qwen3.5-4B-UD-Q4_K_XL.gguf"
+              />
             </Field>
           </div>
           <button
@@ -819,22 +832,7 @@ export default function App() {
           >
             Start download
           </button>
-          {hfJobStatus && (
-            <pre
-              style={{
-                background: "#0e1016",
-                padding: 12,
-                borderRadius: 8,
-                marginTop: 12,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                overflowWrap: "anywhere",
-                maxWidth: "100%",
-              }}
-            >
-              {JSON.stringify(hfJobStatus, null, 2)}
-            </pre>
-          )}
+          {hfJobStatus ? <HfDownloadJobPanel job={hfJobStatus} /> : null}
         </div>
       )}
 
@@ -949,6 +947,76 @@ export default function App() {
       <footer style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #2a3142", color: "#6b7280", fontSize: 13 }}>
         llamacpp-panel{appVersion ? ` v${appVersion}` : ""}
       </footer>
+    </div>
+  );
+}
+
+function HfDownloadJobPanel({ job }: { job: Record<string, unknown> }) {
+  const err = job.error != null ? String(job.error) : "";
+  const wrap: CSSProperties = {
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  };
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: 12,
+        borderRadius: 8,
+        border: "1px solid #2a3142",
+        background: "#0e1016",
+        maxWidth: "100%",
+        overflow: "hidden",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#9aa3b5", marginBottom: 8 }}>Download job</div>
+      <div style={{ fontSize: 14, marginBottom: 4 }}>
+        <strong>Status:</strong> {String(job.status ?? "—")}
+      </div>
+      {"repo_id" in job ? (
+        <div style={{ fontSize: 13, wordBreak: "break-all", marginBottom: 4 }}>
+          <strong>Repo:</strong> {String(job.repo_id)}
+        </div>
+      ) : null}
+      {"filename" in job ? (
+        <div style={{ fontSize: 13, wordBreak: "break-all", marginBottom: 4 }}>
+          <strong>Filename:</strong> {String(job.filename)}
+        </div>
+      ) : null}
+      {"progress" in job && job.progress != null ? (
+        <div style={{ fontSize: 13, marginBottom: 4 }}>
+          <strong>Progress:</strong> {String(job.progress)}
+        </div>
+      ) : null}
+      {"local_path" in job && job.local_path != null ? (
+        <div style={{ fontSize: 13, wordBreak: "break-all", marginBottom: 4 }}>
+          <strong>Local path:</strong> {String(job.local_path)}
+        </div>
+      ) : null}
+      {err ? (
+        <>
+          <div style={{ marginTop: 10, color: "#f88", fontWeight: 600, fontSize: 13 }}>Error</div>
+          <pre
+            style={{
+              ...wrap,
+              margin: "8px 0 0",
+              fontSize: 13,
+              fontFamily: "ui-monospace, monospace",
+              color: "#e8eaed",
+            }}
+          >
+            {err}
+          </pre>
+        </>
+      ) : null}
+      <details style={{ marginTop: 12 }}>
+        <summary style={{ cursor: "pointer", color: "#9aa3b5", fontSize: 13 }}>Raw JSON</summary>
+        <pre style={{ ...wrap, marginTop: 8, fontSize: 12, color: "#c5cad6" }}>
+          {JSON.stringify(job, null, 2)}
+        </pre>
+      </details>
     </div>
   );
 }

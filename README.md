@@ -97,7 +97,7 @@ In-app **Help** tab (after `npm run build`) mirrors [`docs/panel-user-guide.md`]
 - **Model roots:** directories scanned for `.gguf` files.
 - **Launch profile:** `llama-server` flags such as context size, GPU layers, metrics, API key, local path (`-m`) or Hugging Face repo (`-hf`).
 
-Hugging Face downloads use the standard cache via `huggingface_hub`. Use the full repo id **`organization/repository-name`** (not just the org), and the **exact `.gguf` filename** as shown on the model page. For gated repos, run `huggingface-cli login` (or set `HF_TOKEN`). On Windows you can use `py -m huggingface_hub.cli.huggingface_cli login` if `huggingface-cli` is not on PATH.
+Hugging Face downloads use `huggingface_hub` with the **exact file name** from the repo’s **Files** list—not the `llama-server -hf org/repo:quant` shorthand (the part after `:` is llama.cpp-specific). Example: for `llama-server -hf unsloth/Qwen3.5-4B-GGUF:UD-Q4_K_XL`, the panel wants repo **`unsloth/Qwen3.5-4B-GGUF`** and filename **`Qwen3.5-4B-UD-Q4_K_XL.gguf`**. For gated repos, run `huggingface-cli login` (or set `HF_TOKEN`). On Windows you can use `py -m huggingface_hub.cli.huggingface_cli login` if `huggingface-cli` is not on PATH.
 
 ### Windows notes
 

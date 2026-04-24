@@ -65,7 +65,7 @@ These values are passed (with small transformations) when the supervisor starts 
 - **Current model** shows what will be used on the next server start (from the launch profile).
 - **Scan GGUF** refreshes the table from **model roots**.
 - **Use** on a row sets `model_mode` to `local`, updates `local_model_path`, and saves the launch profile.
-- **Hugging Face download** starts a background job. Enter the full **`organization/repository-name`** (as in the model URL on huggingface.co), and the **exact `.gguf` filename** from the repo’s file list—not a shorthand org name or strings with `:` that belong in revision selectors. When finished, point the launch profile at the downloaded file or HF repo as appropriate. Gated models require `huggingface-cli login` (or `HF_TOKEN`). Long errors in the status panel wrap for readability.
+- **Hugging Face download** starts a background job via `huggingface_hub` using a **real file path** in the repo (see the **Files** tab on the model page). It does **not** accept the same string as `llama-server -hf org/repo:quant`: that colon form is **llama.cpp’s** shorthand. Example from Unsloth Qwen3.5-4B: docs may show `llama-server -hf unsloth/Qwen3.5-4B-GGUF:UD-Q4_K_XL` — in the panel use repo **`unsloth/Qwen3.5-4B-GGUF`** and filename **`Qwen3.5-4B-UD-Q4_K_XL.gguf`** (the actual object name on the Hub). When finished, point the launch profile at the downloaded file or HF repo as appropriate. Gated models require `huggingface-cli login` (or `HF_TOKEN`). Job errors are shown in a dedicated block so long messages wrap.
 
 ---
 
