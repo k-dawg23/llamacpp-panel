@@ -14,6 +14,8 @@ Optional: Vulkan or CUDA drivers for GPU inference, depending on your `llama-ser
 
 **Python command:** On **Linux**, use `python3` (or `python` if that points to 3.11+). On **Windows**, the [Python launcher](https://docs.python.org/3/using/windows.html#python-launcher-for-windows) `py` is recommended, e.g. `py -3.11`.
 
+**Chaining commands:** In **bash/zsh**, `a && b` runs `b` only if `a` succeeds. **Windows PowerShell 5.x** (default in older setups) does **not** support `&&`; use **`;`** instead (e.g. `cd web; npm install; npm run build; cd ..`). **PowerShell 7+** adds `&&`—if yours supports it, you can use either style.
+
 ## Setup
 
 **Linux / macOS (bash or zsh)** — use `source` to activate; do **not** use this in PowerShell.
@@ -78,10 +80,16 @@ Terminal 1 — Windows (PowerShell, venv activated):
 py -m uvicorn llamacpp_panel.app:app --host 127.0.0.1 --port 8742 --reload
 ```
 
-Terminal 2 (any OS):
+Terminal 2 — Linux / macOS:
 
 ```bash
 cd web && npm run dev
+```
+
+Terminal 2 — Windows (PowerShell):
+
+```powershell
+cd web; npm run dev
 ```
 
 Open `http://127.0.0.1:5173` — Vite proxies `/api` to port 8742.

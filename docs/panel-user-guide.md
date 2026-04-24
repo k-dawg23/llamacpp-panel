@@ -13,6 +13,7 @@ This document describes the **llamacpp-panel** web UI: what each tab does, what 
 - **Stop server:** termination is **best-effort** compared to Linux (no full SIGTERM semantics).
 - **GPUs:** if **`nvidia-smi`** or **`nvidia-smi.exe`** is on `PATH`, the Settings GPU list works like on Linux.
 - Run **native Windows Python** with a **Windows** `llama-server` build; mixing WSL binaries with a Windows-hosted panel is unsupported.
+- **PowerShell:** use **`;`** to chain commands (e.g. `cd web; npm run build`), not **`&&`** (that is bash; only PowerShell 7+ supports `&&`).
 
 ---
 
