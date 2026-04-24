@@ -4,6 +4,18 @@ This document describes the **llamacpp-panel** web UI: what each tab does, what 
 
 ---
 
+## Windows (10 / 11)
+
+- **Bundle directory:** use the folder that contains **`llama-server.exe`** and the usual **`.dll`** dependencies next to it (same pattern as Linux `.so` siblings).
+- **Library search:** the supervisor prepends the bundle directory to the child’s **`PATH`** (not `LD_LIBRARY_PATH`, which Windows ignores for native executables).
+- **Config file:** `%LOCALAPPDATA%\llamacpp-panel\config.json` (not `~/.config` on Windows).
+- **Validate binary** does not require POSIX “execute bits”; it checks the file exists (and runs `--version` when possible).
+- **Stop server:** termination is **best-effort** compared to Linux (no full SIGTERM semantics).
+- **GPUs:** if **`nvidia-smi`** or **`nvidia-smi.exe`** is on `PATH`, the Settings GPU list works like on Linux.
+- Run **native Windows Python** with a **Windows** `llama-server` build; mixing WSL binaries with a Windows-hosted panel is unsupported.
+
+---
+
 ## Tabs overview
 
 | Tab | Purpose |
@@ -21,8 +33,8 @@ This document describes the **llamacpp-panel** web UI: what each tab does, what 
 ### Paths and supervisor
 
 - **llama.cpp bundle directory**  
-  Absolute path to the folder containing the `llama-server` executable (and usually sibling `.so` files for portable Vulkan builds).  
-  **Save path** writes it to config. **Validate binary** checks that `llama-server` exists and is executable.
+  Absolute path to the folder containing the `llama-server` executable (Linux) or `llama-server.exe` (Windows), with sibling shared libraries (`.so` / `.dll`) for portable bundles.  
+  **Save path** writes it to config. **Validate binary** checks that the executable exists (POSIX: executable bit; Windows: file present + `--version` probe).
 
 - **Model roots (one per line)**  
   Directories searched when you click **Scan GGUF** on the Models tab. Paths should be absolute or as you use on the host. **Save model roots** persists the list.

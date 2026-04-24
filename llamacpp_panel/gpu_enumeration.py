@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import shutil
 import subprocess
 from typing import Literal
 
@@ -23,6 +24,15 @@ class GpuListResult(BaseModel):
     message: str = ""
 
 
+def nvidia_smi_executable() -> str:
+    """Return ``nvidia-smi`` on PATH, trying ``.exe`` on Windows via :func:`shutil.which`."""
+    for name in ("nvidia-smi", "nvidia-smi.exe"):
+        p = shutil.which(name)
+        if p:
+            return p
+    return "nvidia-smi"
+
+
 def parse_nvidia_smi_csv(output: str) -> list[GpuDevice]:
     """Parse `nvidia-smi --query-gpu=index,uuid,name --format=csv,noheader` output."""
     devices: list[GpuDevice] = []
@@ -42,7 +52,7 @@ def enumerate_gpus() -> GpuListResult:
     try:
         proc = subprocess.run(
             [
-                "nvidia-smi",
+                nvidia_smi_executable(),
                 "--query-gpu=index,uuid,name",
                 "--format=csv,noheader",
             ],

@@ -5,7 +5,10 @@ import os
 from pathlib import Path
 from typing import Literal
 
+import platformdirs
 from pydantic import BaseModel, Field
+
+from llamacpp_panel.platform_util import is_windows
 
 
 def xdg_config_home() -> Path:
@@ -16,6 +19,9 @@ def xdg_config_home() -> Path:
 
 
 def default_config_path() -> Path:
+    if is_windows():
+        base = Path(platformdirs.user_config_dir("llamacpp-panel", appauthor=False))
+        return base / "config.json"
     return xdg_config_home() / "llamacpp-panel" / "config.json"
 
 
@@ -59,5 +65,18 @@ class AppConfig(BaseModel):
 
 
 def resolve_llama_server_path(llama_bin_dir: str) -> Path:
+    """Resolve the supervised executable inside ``llama_bin_dir``.
+
+    On Windows, prefers ``llama-server.exe``, then a bare ``llama-server`` if present.
+    On POSIX, uses ``llama-server``.
+    """
     d = Path(llama_bin_dir).expanduser().resolve()
+    if is_windows():
+        exe = d / "llama-server.exe"
+        if exe.is_file():
+            return exe
+        fallback = d / "llama-server"
+        if fallback.is_file():
+            return fallback
+        return exe
     return d / "llama-server"

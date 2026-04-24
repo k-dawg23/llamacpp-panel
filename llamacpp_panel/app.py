@@ -25,6 +25,7 @@ from llamacpp_panel.hf_download import HfJobManager
 from llamacpp_panel.logs import RingBuffer
 from llamacpp_panel.models_scan import scan_gguf_roots
 from llamacpp_panel.monitoring import fetch_llama_server_status
+from llamacpp_panel.platform_util import apply_bundle_library_env, is_windows
 from llamacpp_panel.supervisor import LlamaSupervisor
 
 
@@ -119,7 +120,7 @@ def create_app(
                 "server_path": str(server),
                 "error": "llama-server not found",
             }
-        if not os.access(server, os.X_OK):
+        if not is_windows() and not os.access(server, os.X_OK):
             return {
                 "ok": False,
                 "server_path": str(server),
@@ -129,9 +130,7 @@ def create_app(
         try:
             bin_dir = Path(d).expanduser().resolve()
             env = os.environ.copy()
-            env["LD_LIBRARY_PATH"] = (
-                f"{bin_dir}:{env['LD_LIBRARY_PATH']}" if env.get("LD_LIBRARY_PATH") else str(bin_dir)
-            )
+            apply_bundle_library_env(env, bin_dir)
             proc = subprocess.run(
                 [str(server), "--version"],
                 capture_output=True,

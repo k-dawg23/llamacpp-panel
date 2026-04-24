@@ -9,6 +9,7 @@ from pathlib import Path
 from llamacpp_panel.args import build_llama_server_argv
 from llamacpp_panel.config import AppConfig, LaunchProfile, resolve_llama_server_path
 from llamacpp_panel.gpu_enumeration import apply_gpu_device_to_env
+from llamacpp_panel.platform_util import apply_bundle_library_env, is_windows
 from llamacpp_panel.logs import LogBroadcaster, RingBuffer
 
 
@@ -29,12 +30,6 @@ class LlamaSupervisor:
         self.buffer = RingBuffer(5000)
         self.broadcaster = LogBroadcaster()
 
-    def _prepend_ld_path(self, env: dict[str, str], bundle_dir: Path) -> None:
-        key = "LD_LIBRARY_PATH"
-        prefix = str(bundle_dir)
-        prev = env.get(key, "")
-        env[key] = f"{prefix}:{prev}" if prev else prefix
-
     async def start(self, profile_override: LaunchProfile | None = None) -> None:
         if self._proc and self._proc.returncode is None:
             raise RuntimeError("llama-server is already running")
@@ -45,7 +40,7 @@ class LlamaSupervisor:
         server = resolve_llama_server_path(str(bin_dir))
         if not server.is_file():
             raise FileNotFoundError(f"llama-server not found at {server}")
-        if not os.access(server, os.X_OK):
+        if not is_windows() and not os.access(server, os.X_OK):
             raise PermissionError(f"llama-server is not executable: {server}")
 
         try:
@@ -55,7 +50,7 @@ class LlamaSupervisor:
             raise
 
         env = os.environ.copy()
-        self._prepend_ld_path(env, bin_dir.resolve())
+        apply_bundle_library_env(env, bin_dir.resolve())
         apply_gpu_device_to_env(env, profile.gpu_device_id)
 
         self.buffer = RingBuffer(cfg.log_buffer_lines)

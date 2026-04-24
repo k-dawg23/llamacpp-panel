@@ -1,16 +1,20 @@
 # llamacpp-panel
 
-Local web UI and supervisor for [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` on Linux (tested layout: Ubuntu 24.04, Vulkan tarball bundles).
+Local web UI and supervisor for [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server`. **Linux** (tested: Ubuntu 24.04, Vulkan tarball bundles) and **Windows 10 / 11** (native Python; single-user, localhost-first).
 
 ## Prerequisites
 
 - **Python** 3.11+
 - **Node.js** 20+ (only to build the web UI)
-- A working **llama.cpp** build or release bundle containing `llama-server` (and typically sibling `.so` files for portable Vulkan builds)
+- A working **llama.cpp** build or release bundle:
+  - **Linux:** `llama-server` plus sibling `.so` files when using portable bundles.
+  - **Windows:** `llama-server.exe` plus sibling `.dll` files in the same folder (typical release layout).
 
-Optional: Vulkan drivers for GPU inference when using a Vulkan build.
+Optional: Vulkan or CUDA drivers for GPU inference, depending on your `llama-server` build.
 
 ## Setup
+
+**Linux / macOS-style shell:**
 
 ```bash
 cd /path/to/llama_front_end
@@ -18,6 +22,16 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cd web && npm install && npm run build && cd ..
+```
+
+**Windows (PowerShell or Command Prompt):**
+
+```powershell
+cd C:\path\to\llama_front_end
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+cd web; npm install; npm run build; cd ..
 ```
 
 ## Run
@@ -29,7 +43,12 @@ source .venv/bin/activate
 python -m llamacpp_panel
 ```
 
-Open `http://127.0.0.1:8742` (configurable via `~/.config/llamacpp-panel/config.json`).
+On Windows, after activating the venv: `python -m llamacpp_panel`.
+
+Open `http://127.0.0.1:8742`. **Config file location:**
+
+- **Linux / other POSIX:** `~/.config/llamacpp-panel/config.json` (or `$XDG_CONFIG_HOME/llamacpp-panel/config.json`).
+- **Windows:** `%LOCALAPPDATA%\llamacpp-panel\config.json` (via [platformdirs](https://pypi.org/project/platformdirs/)).
 
 **Development (hot reload UI, API proxied):**
 
@@ -54,7 +73,13 @@ In-app **Help** tab (after `npm run build`) mirrors [`docs/panel-user-guide.md`]
 
 ## Configuration
 
-- **Bundle directory:** folder containing `llama-server` (for example an unpacked release). The supervisor prepends this directory to `LD_LIBRARY_PATH` for the child process only.
+- **Bundle directory:** folder containing `llama-server` (Linux) or `llama-server.exe` (Windows). For the supervised child only, the panel prepends this directory to **`LD_LIBRARY_PATH`** on POSIX or to **`PATH`** on Windows so bundled shared libraries resolve (same idea as the Linux tarball layout; Windows uses DLL load rules).
+
+### Windows notes
+
+- Use a **native Windows** `llama-server.exe` with **native Windows Python** (not WSL-only binaries unless you run the whole stack in WSL).
+- **Stop** uses Python’s process API; graceful shutdown is weaker than POSIX `SIGTERM`—expect best-effort termination.
+- **GPU list:** `nvidia-smi` / `nvidia-smi.exe` on `PATH` uses the same CSV query as on Linux.
 - **Model roots:** directories scanned for `.gguf` files.
 - **Launch profile:** `llama-server` flags such as context size, GPU layers, metrics, API key, local path (`-m`) or Hugging Face repo (`-hf`).
 
