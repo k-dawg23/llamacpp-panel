@@ -12,24 +12,31 @@ Local web UI and supervisor for [llama.cpp](https://github.com/ggml-org/llama.cp
 
 Optional: Vulkan or CUDA drivers for GPU inference, depending on your `llama-server` build.
 
+**Python command:** On **Linux**, use `python3` (or `python` if that points to 3.11+). On **Windows**, the [Python launcher](https://docs.python.org/3/using/windows.html#python-launcher-for-windows) `py` is recommended, e.g. `py -3.11`.
+
 ## Setup
 
-**Linux / macOS-style shell:**
+**Linux / macOS (bash or zsh)** — use `source` to activate; do **not** use this in PowerShell.
 
 ```bash
 cd /path/to/llama_front_end
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cd web && npm install && npm run build && cd ..
 ```
 
-**Windows (PowerShell or Command Prompt):**
+**Windows (PowerShell in VS Code or similar)** — `source` is not valid; activate with the script under `Scripts`:
 
 ```powershell
 cd C:\path\to\llama_front_end
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+```
+
+If execution policy blocks activation, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (or use **Command Prompt** and `.\.venv\Scripts\activate.bat`).
+
+```powershell
 pip install -e ".[dev]"
 cd web; npm install; npm run build; cd ..
 ```
@@ -38,12 +45,18 @@ cd web; npm install; npm run build; cd ..
 
 **Production-style (API + built UI on one port):**
 
+Linux / macOS:
+
 ```bash
 source .venv/bin/activate
-python -m llamacpp_panel
+python3 -m llamacpp_panel
 ```
 
-On Windows, after activating the venv: `python -m llamacpp_panel`.
+Windows (venv activated as above):
+
+```powershell
+py -m llamacpp_panel
+```
 
 Open `http://127.0.0.1:8742`. **Config file location:**
 
@@ -52,14 +65,20 @@ Open `http://127.0.0.1:8742`. **Config file location:**
 
 **Development (hot reload UI, API proxied):**
 
-Terminal 1:
+Terminal 1 — Linux / macOS:
 
 ```bash
 source .venv/bin/activate
 uvicorn llamacpp_panel.app:app --host 127.0.0.1 --port 8742 --reload
 ```
 
-Terminal 2:
+Terminal 1 — Windows (PowerShell, venv activated):
+
+```powershell
+py -m uvicorn llamacpp_panel.app:app --host 127.0.0.1 --port 8742 --reload
+```
+
+Terminal 2 (any OS):
 
 ```bash
 cd web && npm run dev
@@ -75,15 +94,16 @@ In-app **Help** tab (after `npm run build`) mirrors [`docs/panel-user-guide.md`]
 
 - **Bundle directory:** folder containing `llama-server` (Linux) or `llama-server.exe` (Windows). For the supervised child only, the panel prepends this directory to **`LD_LIBRARY_PATH`** on POSIX or to **`PATH`** on Windows so bundled shared libraries resolve (same idea as the Linux tarball layout; Windows uses DLL load rules).
 
+- **Model roots:** directories scanned for `.gguf` files.
+- **Launch profile:** `llama-server` flags such as context size, GPU layers, metrics, API key, local path (`-m`) or Hugging Face repo (`-hf`).
+
+Hugging Face downloads use the standard cache via `huggingface_hub`. Use the full repo id **`organization/repository-name`** (not just the org), and the **exact `.gguf` filename** as shown on the model page. For gated repos, run `huggingface-cli login` (or set `HF_TOKEN`). On Windows you can use `py -m huggingface_hub.cli.huggingface_cli login` if `huggingface-cli` is not on PATH.
+
 ### Windows notes
 
 - Use a **native Windows** `llama-server.exe` with **native Windows Python** (not WSL-only binaries unless you run the whole stack in WSL).
 - **Stop** uses Python’s process API; graceful shutdown is weaker than POSIX `SIGTERM`—expect best-effort termination.
 - **GPU list:** `nvidia-smi` / `nvidia-smi.exe` on `PATH` uses the same CSV query as on Linux.
-- **Model roots:** directories scanned for `.gguf` files.
-- **Launch profile:** `llama-server` flags such as context size, GPU layers, metrics, API key, local path (`-m`) or Hugging Face repo (`-hf`).
-
-Hugging Face downloads use the standard cache via `huggingface_hub` (login with `huggingface-cli login` if a repo is gated).
 
 ## Multi-GPU (NVIDIA)
 
@@ -100,8 +120,10 @@ If `nvidia-smi` is missing, use **Default** or a manual **`vk:N`** line in the G
 
 ```bash
 source .venv/bin/activate
-pytest
+python3 -m pytest
 ```
+
+Windows (PowerShell, venv activated): `py -m pytest`.
 
 ## License
 

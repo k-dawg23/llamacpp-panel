@@ -65,7 +65,7 @@ These values are passed (with small transformations) when the supervisor starts 
 - **Current model** shows what will be used on the next server start (from the launch profile).
 - **Scan GGUF** refreshes the table from **model roots**.
 - **Use** on a row sets `model_mode` to `local`, updates `local_model_path`, and saves the launch profile.
-- **Hugging Face download** starts a background job; when finished, point the launch profile at the downloaded file or HF repo as appropriate.
+- **Hugging Face download** starts a background job. Enter the full **`organization/repository-name`** (as in the model URL on huggingface.co), and the **exact `.gguf` filename** from the repo’s file list—not a shorthand org name or strings with `:` that belong in revision selectors. When finished, point the launch profile at the downloaded file or HF repo as appropriate. Gated models require `huggingface-cli login` (or `HF_TOKEN`). Long errors in the status panel wrap for readability.
 
 ---
 

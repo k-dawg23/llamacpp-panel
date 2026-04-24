@@ -334,7 +334,16 @@ export default function App() {
       {err && (
         <div style={{ ...stylePanel, borderColor: "#633" }}>
           <strong>Error</strong>
-          <pre style={{ whiteSpace: "pre-wrap", margin: "0.5rem 0 0" }}>{err}</pre>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+              margin: "0.5rem 0 0",
+            }}
+          >
+            {err}
+          </pre>
         </div>
       )}
 
@@ -781,10 +790,16 @@ export default function App() {
 
           <h3>Hugging Face download</h3>
           <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
-            <Field label="Repo id" hint="Hugging Face repository id, e.g. TheBloke/Llama-2-7B-GGUF.">
-              <input value={hfRepo} onChange={(e) => setHfRepo(e.target.value)} style={inputStyle} placeholder="org/repo" />
+            <Field
+              label="Repo id"
+              hint="Full id: organization/repository-name (e.g. unsloth/Qwen3.5-4B-GGUF). Not the org name alone—must match the repo URL on huggingface.co."
+            >
+              <input value={hfRepo} onChange={(e) => setHfRepo(e.target.value)} style={inputStyle} placeholder="org/model-repo" />
             </Field>
-            <Field label="Filename in repo" hint="Exact GGUF filename inside the repo to download.">
+            <Field
+              label="Filename in repo"
+              hint="Exact GGUF file name in that repo root (e.g. Qwen3.5-4B-Q4_K_M.gguf). Not a revision or subpath with colons—copy from the Files list on the model page."
+            >
               <input value={hfFile} onChange={(e) => setHfFile(e.target.value)} style={inputStyle} placeholder="model-Q4_K_M.gguf" />
             </Field>
           </div>
@@ -805,7 +820,18 @@ export default function App() {
             Start download
           </button>
           {hfJobStatus && (
-            <pre style={{ background: "#0e1016", padding: 12, borderRadius: 8, marginTop: 12 }}>
+            <pre
+              style={{
+                background: "#0e1016",
+                padding: 12,
+                borderRadius: 8,
+                marginTop: 12,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
+                maxWidth: "100%",
+              }}
+            >
               {JSON.stringify(hfJobStatus, null, 2)}
             </pre>
           )}
