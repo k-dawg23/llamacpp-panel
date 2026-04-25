@@ -48,7 +48,7 @@ const TAB_ROWS: { key: TabKey; label: string; hint: string }[] = [
   {
     key: "server",
     label: "Server",
-    hint: "Start or stop supervised llama-server and view live process logs.",
+    hint: "Start or stop supervised llama-server, open its web UI in a new tab, and view live process logs.",
   },
   {
     key: "monitor",
@@ -66,6 +66,16 @@ function launchProfileMatchesPreset(lp: LaunchProfile, presetName: string): bool
   const p = presets[presetName];
   if (!p) return false;
   return (Object.keys(p) as (keyof LaunchProfile)[]).every((k) => lp[k] === p[k]);
+}
+
+/** Base URL for llama-server's HTTP web UI (opened in the system browser). */
+function serverWebUiBaseUrl(host: string, port: number): string {
+  const h = host.trim() || "127.0.0.1";
+  const openHost = h === "0.0.0.0" ? "127.0.0.1" : h;
+  if (openHost.includes(":") && !openHost.startsWith("[")) {
+    return `http://[${openHost}]:${port}/`;
+  }
+  return `http://${openHost}:${port}/`;
 }
 
 function tabButtonStyle(active: boolean): CSSProperties {
@@ -135,6 +145,9 @@ export default function App() {
   const [hfFile, setHfFile] = useState("");
   const [hfJobId, setHfJobId] = useState<string | null>(null);
   const [hfJobStatus, setHfJobStatus] = useState<Record<string, unknown> | null>(null);
+  const cfgRef = useRef(cfg);
+  cfgRef.current = cfg;
+  const appliedHfJobIdRef = useRef<string | null>(null);
 
   const [appVersion, setAppVersion] = useState<string>("");
   const [gpus, setGpus] = useState<GpuDevice[]>([]);
@@ -226,12 +239,44 @@ export default function App() {
       hfJob(hfJobId)
         .then(setHfJobStatus)
         .catch(() => {});
-    }, 1000);
+    }, 500);
     hfJob(hfJobId)
       .then(setHfJobStatus)
       .catch(() => {});
     return () => clearInterval(t);
   }, [hfJobId]);
+
+  useEffect(() => {
+    if (!hfJobStatus || hfJobStatus.status !== "done") return;
+    const id = String(hfJobStatus.id ?? "");
+    const path =
+      typeof hfJobStatus.local_path === "string" ? hfJobStatus.local_path.trim() : "";
+    if (!id || !path) return;
+    if (appliedHfJobIdRef.current === id) return;
+    appliedHfJobIdRef.current = id;
+
+    const cur = cfgRef.current;
+    if (!cur) return;
+
+    const parentDir = (p: string): string => {
+      const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+      return i <= 0 ? p : p.slice(0, i);
+    };
+    const root = parentDir(path);
+    const roots = cur.model_roots.slice();
+    if (root && !roots.includes(root)) {
+      roots.push(root);
+    }
+    const nextLp = { ...cur.launch_profile, model_mode: "local" as const, local_model_path: path };
+
+    void putConfig({ model_roots: roots, launch_profile: nextLp })
+      .then((next) => {
+        setCfg(next);
+      })
+      .catch((e) => {
+        setErr(String(e));
+      });
+  }, [hfJobStatus]);
 
   const lp = cfg?.launch_profile;
   const gpuId = lp?.gpu_device_id ?? "";
@@ -697,7 +742,12 @@ export default function App() {
       )}
 
       {tab === "models" && (
-        <div style={stylePanel} role="tabpanel" id="panel-models" aria-labelledby="tab-models">
+        <div
+          style={{ ...stylePanel, minWidth: 0 }}
+          role="tabpanel"
+          id="panel-models"
+          aria-labelledby="tab-models"
+        >
           <h2 style={{ marginTop: 0 }}>Model library</h2>
           <div
             style={{
@@ -824,6 +874,7 @@ export default function App() {
               setErr(null);
               try {
                 const r = await hfDownload(hfRepo.trim(), hfFile.trim());
+                appliedHfJobIdRef.current = null;
                 setHfJobId(r.job_id);
               } catch (e) {
                 setErr(String(e));
@@ -884,6 +935,18 @@ export default function App() {
               }}
             >
               Stop
+            </button>
+            <button
+              type="button"
+              style={btn}
+              disabled={!sup?.running}
+              title="Open llama-server's web UI in a new browser tab (uses server host/port from Settings; 0.0.0.0 opens as 127.0.0.1)."
+              onClick={() => {
+                const u = serverWebUiBaseUrl(lp.server_host, lp.server_port);
+                window.open(u, "_blank", "noopener,noreferrer");
+              }}
+            >
+              Open web UI in new tab
             </button>
           </div>
           <h3>Logs</h3>
@@ -958,6 +1021,19 @@ function HfDownloadJobPanel({ job }: { job: Record<string, unknown> }) {
     wordBreak: "break-word",
     overflowWrap: "anywhere",
   };
+  const pathLine: CSSProperties = {
+    fontSize: 13,
+    marginBottom: 4,
+    whiteSpace: "normal",
+    overflowWrap: "anywhere",
+    wordBreak: "break-all",
+    maxWidth: "100%",
+    minWidth: 0,
+  };
+  const prog = typeof job.progress === "number" ? job.progress : Number(job.progress);
+  const pct = Number.isFinite(prog) ? Math.round(Math.min(1, Math.max(0, prog)) * 100) : 0;
+  const st = String(job.status ?? "");
+  const showBar = st === "running" || (st === "done" && pct >= 100);
   return (
     <div
       style={{
@@ -967,6 +1043,7 @@ function HfDownloadJobPanel({ job }: { job: Record<string, unknown> }) {
         border: "1px solid #2a3142",
         background: "#0e1016",
         maxWidth: "100%",
+        minWidth: 0,
         overflow: "hidden",
         boxSizing: "border-box",
       }}
@@ -975,23 +1052,41 @@ function HfDownloadJobPanel({ job }: { job: Record<string, unknown> }) {
       <div style={{ fontSize: 14, marginBottom: 4 }}>
         <strong>Status:</strong> {String(job.status ?? "—")}
       </div>
+      {showBar ? (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: "#9aa3b5", marginBottom: 4 }}>{pct}%</div>
+          <div
+            style={{
+              height: 8,
+              background: "#2a3142",
+              borderRadius: 4,
+              overflow: "hidden",
+              maxWidth: "100%",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${pct}%`,
+                background: "#4a7cbc",
+                transition: "width 0.25s ease-out",
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
       {"repo_id" in job ? (
-        <div style={{ fontSize: 13, wordBreak: "break-all", marginBottom: 4 }}>
+        <div style={pathLine}>
           <strong>Repo:</strong> {String(job.repo_id)}
         </div>
       ) : null}
       {"filename" in job ? (
-        <div style={{ fontSize: 13, wordBreak: "break-all", marginBottom: 4 }}>
+        <div style={pathLine}>
           <strong>Filename:</strong> {String(job.filename)}
         </div>
       ) : null}
-      {"progress" in job && job.progress != null ? (
-        <div style={{ fontSize: 13, marginBottom: 4 }}>
-          <strong>Progress:</strong> {String(job.progress)}
-        </div>
-      ) : null}
       {"local_path" in job && job.local_path != null ? (
-        <div style={{ fontSize: 13, wordBreak: "break-all", marginBottom: 4 }}>
+        <div style={pathLine}>
           <strong>Local path:</strong> {String(job.local_path)}
         </div>
       ) : null}
@@ -1011,9 +1106,19 @@ function HfDownloadJobPanel({ job }: { job: Record<string, unknown> }) {
           </pre>
         </>
       ) : null}
-      <details style={{ marginTop: 12 }}>
+      <details style={{ marginTop: 12, maxWidth: "100%", minWidth: 0 }}>
         <summary style={{ cursor: "pointer", color: "#9aa3b5", fontSize: 13 }}>Raw JSON</summary>
-        <pre style={{ ...wrap, marginTop: 8, fontSize: 12, color: "#c5cad6" }}>
+        <pre
+          style={{
+            ...wrap,
+            marginTop: 8,
+            fontSize: 12,
+            color: "#c5cad6",
+            maxWidth: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+          }}
+        >
           {JSON.stringify(job, null, 2)}
         </pre>
       </details>

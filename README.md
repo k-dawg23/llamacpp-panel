@@ -110,6 +110,7 @@ Hugging Face downloads use `huggingface_hub` with the **exact file name** from t
 ### Windows notes
 
 - Use a **native Windows** `llama-server.exe` with **native Windows Python** (not WSL-only binaries unless you run the whole stack in WSL).
+- If `llama-server` exits immediately and Event Viewer faults **`MSVCP140.dll`** (or `VCRUNTIME*.dll`), install the **Microsoft Visual C++ Redistributable (x64)**—you do not need the full Visual Studio IDE.
 - **Stop** uses Python’s process API; graceful shutdown is weaker than POSIX `SIGTERM`—expect best-effort termination.
 - **GPU list:** `nvidia-smi` / `nvidia-smi.exe` on `PATH` uses the same CSV query as on Linux.
 

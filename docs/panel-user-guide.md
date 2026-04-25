@@ -14,6 +14,7 @@ This document describes the **llamacpp-panel** web UI: what each tab does, what 
 - **GPUs:** if **`nvidia-smi`** or **`nvidia-smi.exe`** is on `PATH`, the Settings GPU list works like on Linux.
 - Run **native Windows Python** with a **Windows** `llama-server` build; mixing WSL binaries with a Windows-hosted panel is unsupported.
 - **PowerShell:** use **`;`** to chain commands (e.g. `cd web; npm run build`), not **`&&`** (that is bash; only PowerShell 7+ supports `&&`).
+- **Visual C++ runtime:** prebuilt `llama-server.exe` builds often need the **Microsoft Visual C++ Redistributable** (x64), which provides DLLs such as **`MSVCP140.dll`**. You do **not** need the full Visual Studio IDE—install the redistributable from Microsoft if the process crashes at startup and Event Viewer shows a fault in `MSVCP140.dll` (or related `VCRUNTIME*.dll`).
 
 ---
 
@@ -74,6 +75,7 @@ These values are passed (with small transformations) when the supervisor starts 
 
 - **Start** spawns `llama-server` with the saved launch profile and bundle `LD_LIBRARY_PATH` behavior.
 - **Stop** sends graceful stop to the child.
+- **Open web UI in new tab** opens `http://<host>:<port>/` in your default browser when the server is **running**, using the **server host** and **port** from Settings. If the bind address is `0.0.0.0`, the link uses `127.0.0.1` so the page loads locally. IPv6 literals are formatted for URLs. This is the upstream `llama-server` web UI, not the panel.
 - **Logs** streams stderr/stdout lines from the supervisor (bounded buffer).
 
 ---
