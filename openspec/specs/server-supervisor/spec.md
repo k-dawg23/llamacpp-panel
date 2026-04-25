@@ -1,29 +1,39 @@
 ### Requirement: Configurable llama.cpp binary directory
 
-The system SHALL allow the user to configure an absolute path to a directory that contains the `llama-server` executable (or an explicit path to the executable). The system SHALL persist this setting across restarts.
+The system SHALL allow the user to configure an absolute path to a directory that contains the `llama-server` executable (or an explicit path to the executable). The system SHALL persist this setting across restarts. On Microsoft Windows, the system SHALL resolve the primary server executable using Windows naming conventions (at minimum `llama-server.exe` in the configured directory). On POSIX hosts, the system SHALL continue to resolve `llama-server` in that directory. Validation SHALL verify that the resolved executable exists and is runnable on the host without relying on POSIX execute bits when running on Windows.
 
 #### Scenario: Validate binary on save
 
-- **WHEN** the user saves a new binary directory
-- **THEN** the system SHALL verify that `llama-server` exists at the resolved path and is executable, and SHALL surface a clear error if validation fails
+- **WHEN** the user validates or saves a new binary directory
+- **THEN** the system SHALL verify that the resolved `llama-server` executable exists for the current platform and SHALL surface a clear error if validation fails
 
 #### Scenario: Default first-run path
 
 - **WHEN** no binary path has been configured yet
 - **THEN** the system SHALL prompt the user to select a directory before starting the server
 
+#### Scenario: Windows executable present
+
+- **WHEN** the host runs Windows and the bundle directory contains `llama-server.exe`
+- **THEN** validation and start SHALL resolve that executable without requiring a file named exactly `llama-server` with no extension
+
 ### Requirement: Bundled shared library discovery
 
-When the configured directory contains shared objects required by `llama-server` (for example `libllama.so` siblings in the same folder), the system SHALL set `LD_LIBRARY_PATH` for the supervised child process so that directory is searched first, without modifying the user’s global shell environment.
+When the configured directory contains native libraries required by `llama-server` (for example `libllama.so` siblings on POSIX or `.dll` siblings on Windows), the system SHALL apply host-appropriate dynamic library search rules for the supervised child process only, without modifying the user’s global environment. On POSIX, the system SHALL prepend the bundle directory to `LD_LIBRARY_PATH` (with the platform’s path separator convention). On Windows, the system SHALL prepend the bundle directory to the child process `PATH` (with `;` as the separator) and SHALL document that many layouts rely on DLLs colocated with `llama-server.exe`.
 
-#### Scenario: Launch with bundle layout
+#### Scenario: Launch with bundle layout on POSIX
 
-- **WHEN** the user starts the server from a Vulkan or portable bundle directory that includes `llama-server` and required `.so` files
-- **THEN** the supervised process SHALL inherit an `LD_LIBRARY_PATH` that includes that directory and SHALL start successfully when the upstream binary is otherwise compatible with the host
+- **WHEN** the user starts the server from a portable bundle directory that includes `llama-server` and required native libraries for Linux
+- **THEN** the supervised process SHALL inherit an `LD_LIBRARY_PATH` that includes that directory first and SHALL start successfully when the upstream binary is otherwise compatible with the host
+
+#### Scenario: Launch with bundle layout on Windows
+
+- **WHEN** the user starts the server from a portable bundle directory on Windows that includes `llama-server.exe` and required `.dll` files
+- **THEN** the supervised process SHALL inherit a `PATH` whose first segment is the bundle directory (in addition to any system PATH) and SHALL start successfully when the upstream binary is otherwise compatible with the host
 
 ### Requirement: Start and stop supervised server
 
-The system SHALL start `llama-server` as a child process using arguments derived from the active launch profile (model source, flags, host, port, and optional extra CLI tokens). The system SHALL support graceful stop (SIGTERM) and SHALL detect unexpected exit and record the last exit code.
+The system SHALL start `llama-server` as a child process using arguments derived from the active launch profile (model source, flags, host, port, and optional extra CLI tokens). On POSIX hosts, the system SHALL support graceful stop via `SIGTERM` (or equivalent) before forced termination. On Windows, the system SHALL support best-effort termination consistent with Python’s process API (which may not deliver POSIX-style graceful shutdown). The system SHALL detect unexpected exit and record the last exit code on all supported hosts.
 
 #### Scenario: Start succeeds
 
@@ -65,4 +75,4 @@ When the launch profile contains a non-empty GPU device identifier and the imple
 #### Scenario: No GPU selection saved
 
 - **WHEN** the GPU device identifier is unset or blank
-- **THEN** the supervisor SHALL not inject GPU-restricting environment variables beyond existing bundle `LD_LIBRARY_PATH` behavior
+- **THEN** the supervisor SHALL not inject GPU-restricting environment variables beyond existing bundle library search behavior (`LD_LIBRARY_PATH` on POSIX; bundle `PATH` prepend on Windows as specified above)
