@@ -1,7 +1,7 @@
 ## 1. Release metadata
 
 - [x] 1.1 Bump `pyproject.toml` and `llamacpp_panel/__init__.py` to **0.2.0**; align `web/package.json` version if required by project convention
-- [ ] 1.2 After verification, create and push git tag **`v0.2.0`** (and optional GitHub release notes)
+- [x] 1.2 After verification, create and push git tag **`v0.2.0`** (and optional GitHub release notes)
 
 ## 2. Cross-platform path and config helpers
 
