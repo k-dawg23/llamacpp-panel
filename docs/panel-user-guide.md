@@ -6,6 +6,7 @@ This document describes the **llamacpp-panel** web UI: what each tab does, what 
 
 ## Windows (10 / 11)
 
+- **Test coverage:** end-to-end use (validate, start, stop, logs) was exercised on **Windows 11** only. **Windows 10** is expected to work the same but is not separately tested here.
 - **Bundle directory:** use the folder that contains **`llama-server.exe`** and the usual **`.dll`** dependencies next to it (same pattern as Linux `.so` siblings).
 - **Library search:** the supervisor prepends the bundle directory to the child’s **`PATH`** (not `LD_LIBRARY_PATH`, which Windows ignores for native executables).
 - **Config file:** `%LOCALAPPDATA%\llamacpp-panel\config.json` (not `~/.config` on Windows).

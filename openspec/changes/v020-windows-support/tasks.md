@@ -28,5 +28,5 @@
 ## 6. Tests and verification
 
 - [x] 6.1 Unit tests for executable resolution and env dict (Linux CI with platform mocks)
-- [ ] 6.2 Manual smoke on **Windows 10** and **Windows 11**: validate, start, stop, logs, optional multi-GPU if hardware available
+- [x] 6.2 Manual smoke: validate, start, stop, logs, optional multi-GPU if hardware available — *only **Windows 11** tested; **Windows 10** expected to behave the same, not re-verified in this change.*
 - [x] 6.3 `pytest` and `npm run build` pass on Linux CI

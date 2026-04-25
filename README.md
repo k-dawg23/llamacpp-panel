@@ -1,6 +1,6 @@
 # llamacpp-panel
 
-Local web UI and supervisor for [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server`. **Linux** (tested: Ubuntu 24.04, Vulkan tarball bundles) and **Windows 10 / 11** (native Python; single-user, localhost-first).
+Local web UI and supervisor for [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server`. **Linux** (tested: Ubuntu 24.04, Vulkan tarball bundles) and **Windows 10 / 11** (native Python; single-user, localhost-first; **manual smoke: Windows 11 only**—Windows 10 is expected to match but not separately tested).
 
 ## Prerequisites
 
