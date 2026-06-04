@@ -102,8 +102,11 @@ In-app **Help** tab (after `npm run build`) mirrors [`docs/panel-user-guide.md`]
 
 - **Bundle directory:** folder containing `llama-server` (Linux) or `llama-server.exe` (Windows). For the supervised child only, the panel prepends this directory to **`LD_LIBRARY_PATH`** on POSIX or to **`PATH`** on Windows so bundled shared libraries resolve (same idea as the Linux tarball layout; Windows uses DLL load rules).
 
-- **Model roots:** directories scanned for `.gguf` files.
+- **Model roots:** directories scanned for `.gguf` files. Use the built-in folder picker to add roots one at a time, and remove entries from the saved list in Settings.
+- **Project folder:** one saved local directory used as the working directory when launching `pi` from the Server tab. Use the built-in folder picker to choose or replace it.
 - **Launch profile:** `llama-server` flags such as context size, GPU layers, metrics, API key, local path (`-m`) or Hugging Face repo (`-hf`).
+
+`pi` launch expects the host already has both `pi` and `pi-llama-cpp` installed and available in your normal shell environment. The panel does not install or supervise `pi`; it opens a terminal window and starts `pi` there in the selected project folder.
 
 Hugging Face downloads use `huggingface_hub` with the **exact file name** from the repo’s **Files** list—not the `llama-server -hf org/repo:quant` shorthand (the part after `:` is llama.cpp-specific). Example: for `llama-server -hf unsloth/Qwen3.5-4B-GGUF:UD-Q4_K_XL`, the panel wants repo **`unsloth/Qwen3.5-4B-GGUF`** and filename **`Qwen3.5-4B-UD-Q4_K_XL.gguf`**. For gated repos, run `huggingface-cli login` (or set `HF_TOKEN`). On Windows you can use `py -m huggingface_hub.cli.huggingface_cli login` if `huggingface-cli` is not on PATH.
 

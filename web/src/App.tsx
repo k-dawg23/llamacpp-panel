@@ -19,7 +19,9 @@ import {
   listGpus,
   listLocalModels,
   monitorStatus,
+  pickDirectory,
   putConfig,
+  startPiHarness,
   supervisorStart,
   supervisorStatus,
   supervisorStop,
@@ -145,6 +147,7 @@ export default function App() {
   const [hfFile, setHfFile] = useState("");
   const [hfJobId, setHfJobId] = useState<string | null>(null);
   const [hfJobStatus, setHfJobStatus] = useState<Record<string, unknown> | null>(null);
+  const [piStatus, setPiStatus] = useState<{ ok: boolean; message: string; cwd?: string; pid?: number | null } | null>(null);
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
   const appliedHfJobIdRef = useRef<string | null>(null);
@@ -280,6 +283,7 @@ export default function App() {
 
   const lp = cfg?.launch_profile;
   const gpuId = lp?.gpu_device_id ?? "";
+  const selectedProjectFolder = cfg?.selected_project_folder?.trim() ?? "";
 
   const savePartial = async (partial: Partial<AppConfig>) => {
     if (!cfg) return;
@@ -323,6 +327,29 @@ export default function App() {
     } catch (e) {
       setErr(String(e));
     }
+  };
+
+  const addModelRootFromPicker = async () => {
+    if (!cfg) return;
+    setErr(null);
+    const result = await pickDirectory("Choose model root", cfg.model_roots[0] || undefined);
+    if (!result.path) return;
+    const nextRoots = cfg.model_roots.includes(result.path)
+      ? cfg.model_roots
+      : [...cfg.model_roots, result.path];
+    await savePartial({ model_roots: nextRoots });
+  };
+
+  const chooseProjectFolder = async () => {
+    if (!cfg) return;
+    setErr(null);
+    const initialDir = cfg.selected_project_folder || cfg.model_roots[0] || undefined;
+    const result = await pickDirectory("Choose project folder", initialDir);
+    if (!result.path) return;
+    await savePartial({
+      selected_project_folder: result.path,
+      project_folders: result.path ? [result.path] : [],
+    });
   };
 
   const stylePanel = useMemo(
@@ -443,35 +470,108 @@ export default function App() {
             </pre>
           )}
 
-          <label style={{ display: "block", marginTop: 16 }}>
-            <div style={{ color: "#9aa3b5", fontSize: 13 }} title="Directories scanned for .gguf when you click Scan GGUF on the Models tab.">
-              Model roots (one per line)
+          <div style={{ display: "block", marginTop: 16 }}>
+            <div
+              style={{ color: "#9aa3b5", fontSize: 13, marginBottom: 8 }}
+              title="Directories scanned for .gguf when you click Scan GGUF on the Models tab."
+            >
+              Model roots
             </div>
-            <textarea
-              style={{ width: "100%", minHeight: 80, padding: 8, borderRadius: 6, border: "1px solid #2a3142", background: "#0e1016", color: "#e8eaed" }}
-              value={cfg.model_roots.join("\n")}
-              onChange={(e) =>
-                setCfg({
-                  ...cfg,
-                  model_roots: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
-                })
-              }
-              title="One absolute path per line; used by Models → Scan GGUF."
-              aria-describedby="hint-model-roots"
-            />
-            <span id="hint-model-roots" style={srOnly}>
-              One directory per line. The Models tab scans these paths for GGUF files.
-            </span>
-          </label>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => savePartial({ model_roots: cfg.model_roots })}
-            style={{ ...btn, marginTop: 8 }}
-            title="Persist model root directories to configuration."
-          >
-            Save model roots
-          </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void addModelRootFromPicker().catch((e) => setErr(String(e)))}
+                style={btn}
+                title="Open a system folder picker and add one directory to model roots."
+              >
+                Add model root
+              </button>
+            </div>
+            {cfg.model_roots.length > 0 ? (
+              <div style={{ display: "grid", gap: 8 }}>
+                {cfg.model_roots.map((root) => (
+                  <div
+                    key={root}
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      border: "1px solid #2a3142",
+                      background: "#0e1016",
+                    }}
+                  >
+                    <code style={{ flex: 1, wordBreak: "break-all" }}>{root}</code>
+                    <button
+                      type="button"
+                      style={btnSmall}
+                      title="Remove this directory from model roots."
+                      onClick={() =>
+                        void savePartial({
+                          model_roots: cfg.model_roots.filter((entry) => entry !== root),
+                        })
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={mutedBox}>No model roots saved yet.</div>
+            )}
+          </div>
+
+          <div style={{ display: "block", marginTop: 16 }}>
+            <div
+              style={{ color: "#9aa3b5", fontSize: 13, marginBottom: 8 }}
+              title="Folder used when you start pi from the Server tab."
+            >
+              Project folder
+            </div>
+            <div
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid #2a3142",
+                background: "#0e1016",
+                marginBottom: 10,
+              }}
+            >
+              {selectedProjectFolder ? (
+                <code style={{ wordBreak: "break-all" }}>{selectedProjectFolder}</code>
+              ) : (
+                <span style={{ color: "#9aa3b5" }}>No project folder selected.</span>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void chooseProjectFolder().catch((e) => setErr(String(e)))}
+                style={btn}
+                title="Open a system folder picker and save the selected project folder for pi."
+              >
+                Choose project folder
+              </button>
+              <button
+                type="button"
+                disabled={busy || !selectedProjectFolder}
+                onClick={() =>
+                  void savePartial({
+                    selected_project_folder: "",
+                    project_folders: [],
+                  })
+                }
+                style={btnSmall}
+                title="Clear the saved project folder."
+              >
+                Clear
+              </button>
+            </div>
+          </div>
 
           <h3>Launch profile</h3>
           <div style={{ display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr" }}>
@@ -890,6 +990,69 @@ export default function App() {
       {tab === "server" && (
         <div style={stylePanel} role="tabpanel" id="panel-server" aria-labelledby="tab-server">
           <h2 style={{ marginTop: 0 }}>Operations</h2>
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: "1px solid #2a3142",
+              background: "#151821",
+            }}
+          >
+            <div style={{ fontSize: 12, color: "#9aa3b5", marginBottom: 4 }}>pi harness</div>
+            <div style={{ fontWeight: 600, wordBreak: "break-all" }}>
+              {selectedProjectFolder || "No project folder selected"}
+            </div>
+            <div style={{ fontSize: 12, color: "#9aa3b5", marginTop: 6 }}>
+              {selectedProjectFolder
+                ? "pi opens in a separate terminal window, independent from llama-server, and uses this folder as its working directory."
+                : "Add at least one project folder in Settings before launching pi in a terminal window."}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              <button
+                type="button"
+                style={btnPrimary}
+                disabled={busy || !selectedProjectFolder}
+                title="Open a terminal window and start pi in the selected project folder. This does not start or stop llama-server."
+                onClick={async () => {
+                  setBusy(true);
+                  setPiStatus(null);
+                  try {
+                    const result = await startPiHarness(selectedProjectFolder);
+                    setPiStatus(result);
+                  } catch (e) {
+                    setPiStatus({ ok: false, message: String(e), cwd: selectedProjectFolder });
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Start pi harness
+              </button>
+            </div>
+            {piStatus ? (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: 10,
+                  borderRadius: 8,
+                  background: piStatus.ok ? "#173222" : "#3a1d1d",
+                  border: `1px solid ${piStatus.ok ? "#2d6a4f" : "#7a3030"}`,
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                  {piStatus.ok ? "pi terminal opened" : "pi launch failed"}
+                </div>
+                <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{piStatus.message}</div>
+                {piStatus.cwd ? (
+                  <div style={{ marginTop: 4, fontSize: 13, color: "#c5cad6", wordBreak: "break-all" }}>
+                    Folder: <code>{piStatus.cwd}</code>
+                    {piStatus.pid ? ` · pid ${piStatus.pid}` : ""}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
           <p>
             Status:{" "}
             <strong>{sup?.running ? `running (pid ${String(sup.pid)})` : "stopped"}</strong>
@@ -1188,5 +1351,14 @@ const preBox: CSSProperties = {
   padding: 12,
   borderRadius: 8,
   overflow: "auto",
+  fontSize: 13,
+};
+
+const mutedBox: CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: 8,
+  border: "1px solid #2a3142",
+  background: "#0e1016",
+  color: "#9aa3b5",
   fontSize: 13,
 };

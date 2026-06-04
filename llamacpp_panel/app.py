@@ -20,6 +20,7 @@ from llamacpp_panel.config import (
     default_config_path,
     resolve_llama_server_path,
 )
+from llamacpp_panel.directory_picker import pick_directory
 from llamacpp_panel.gpu_enumeration import enumerate_gpus
 from llamacpp_panel.hf_download import HfJobManager
 from llamacpp_panel.logs import RingBuffer
@@ -27,6 +28,7 @@ from llamacpp_panel.models_scan import scan_gguf_roots
 from llamacpp_panel.monitoring import fetch_llama_server_status
 from llamacpp_panel.platform_util import apply_bundle_library_env, is_windows
 from llamacpp_panel.supervisor import LlamaSupervisor
+from llamacpp_panel.tool_launchers import launch_pi_in_folder
 
 
 class ConfigUpdatePayload(BaseModel):
@@ -34,6 +36,8 @@ class ConfigUpdatePayload(BaseModel):
     supervisor_host: str | None = None
     supervisor_port: int | None = None
     model_roots: list[str] | None = None
+    project_folders: list[str] | None = None
+    selected_project_folder: str | None = None
     log_buffer_lines: int | None = None
     launch_profile: dict[str, Any] | None = None
 
@@ -49,6 +53,15 @@ class SupervisorStartPayload(BaseModel):
 class HfDownloadPayload(BaseModel):
     repo_id: str = Field(..., min_length=1)
     filename: str = Field(..., min_length=1)
+
+
+class PiLaunchPayload(BaseModel):
+    project_folder: str | None = None
+
+
+class PickDirectoryPayload(BaseModel):
+    title: str = Field(..., min_length=1)
+    initial_dir: str | None = None
 
 
 class AppState:
@@ -242,6 +255,30 @@ def create_app(
         base = f"http://{lp.server_host}:{lp.server_port}"
         key = lp.api_key.strip() or None
         return await fetch_llama_server_status(base, api_key=key)
+
+    @app.post("/api/tools/pi/start")
+    async def start_pi(payload: PiLaunchPayload | None = None) -> dict[str, Any]:
+        project_folder = (
+            (payload.project_folder if payload else None)
+            or state.config.selected_project_folder
+            or ""
+        )
+        try:
+            return launch_pi_in_folder(project_folder)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @app.post("/api/dialogs/pick-directory")
+    async def pick_directory_dialog(payload: PickDirectoryPayload) -> dict[str, Any]:
+        try:
+            selected = await asyncio.to_thread(
+                pick_directory,
+                title=payload.title.strip(),
+                initial_dir=payload.initial_dir,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        return {"path": selected}
 
     if dist.is_dir():
         app.mount(

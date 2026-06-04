@@ -44,6 +44,8 @@ class AppConfig(BaseModel):
     supervisor_host: str = "127.0.0.1"
     supervisor_port: int = 8742
     model_roots: list[str] = Field(default_factory=list)
+    project_folders: list[str] = Field(default_factory=list)
+    selected_project_folder: str = ""
     log_buffer_lines: int = 5000
     launch_profile: LaunchProfile = Field(default_factory=LaunchProfile)
 

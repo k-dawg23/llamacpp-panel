@@ -19,6 +19,8 @@ export type AppConfig = {
   supervisor_host: string;
   supervisor_port: number;
   model_roots: string[];
+  project_folders: string[];
+  selected_project_folder: string;
   log_buffer_lines: number;
   launch_profile: LaunchProfile;
 };
@@ -124,4 +126,36 @@ export async function monitorStatus() {
   const r = await fetch(api("/api/monitor"));
   if (!r.ok) throw new Error(await r.text());
   return r.json();
+}
+
+export async function startPiHarness(project_folder?: string) {
+  const r = await fetch(api("/api/tools/pi/start"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_folder: project_folder ?? null }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error((d as { detail?: string }).detail ?? r.statusText);
+  }
+  return r.json() as Promise<{
+    ok: boolean;
+    tool: string;
+    cwd: string;
+    message: string;
+    pid: number | null;
+  }>;
+}
+
+export async function pickDirectory(title: string, initial_dir?: string) {
+  const r = await fetch(api("/api/dialogs/pick-directory"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, initial_dir: initial_dir ?? null }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error((d as { detail?: string }).detail ?? r.statusText);
+  }
+  return r.json() as Promise<{ path: string | null }>;
 }

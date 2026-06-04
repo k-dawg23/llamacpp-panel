@@ -23,9 +23,9 @@ This document describes the **llamacpp-panel** web UI: what each tab does, what 
 
 | Tab | Purpose |
 |-----|---------|
-| **Settings** | Binary path, model scan roots, launch profile (`llama-server` arguments), GPU pick, presets. |
+| **Settings** | Binary path, model scan roots, selected project folder for `pi`, launch profile (`llama-server` arguments), GPU pick, presets. |
 | **Models** | Scan local `.gguf` files, set the active model with **Use**, Hugging Face downloads. |
-| **Server** | Start/stop the supervised `llama-server` and view streamed logs. |
+| **Server** | Start/stop the supervised `llama-server`, launch `pi` from the selected project folder, and view streamed logs. |
 | **Monitor** | Poll the running server’s HTTP health/props/slots/metrics (if enabled). |
 | **Help** | This guide rendered inside the app. |
 
@@ -39,8 +39,11 @@ This document describes the **llamacpp-panel** web UI: what each tab does, what 
   Absolute path to the folder containing the `llama-server` executable (Linux) or `llama-server.exe` (Windows), with sibling shared libraries (`.so` / `.dll`) for portable bundles.  
   **Save path** writes it to config. **Validate binary** checks that the executable exists (POSIX: executable bit; Windows: file present + `--version` probe).
 
-- **Model roots (one per line)**  
-  Directories searched when you click **Scan GGUF** on the Models tab. Paths should be absolute or as you use on the host. **Save model roots** persists the list.
+- **Model roots**  
+  Directories searched when you click **Scan GGUF** on the Models tab. Use **Add model root** to open the system folder picker and append one directory to the saved list. Use **Remove** on any saved row to delete it.
+
+- **Project folder**  
+  The active project workspace for `pi` launch. Use **Choose project folder** to open the system folder picker and save a single directory for `pi`. Use **Clear** to remove the saved value.
 
 ### Launch profile
 
@@ -74,6 +77,9 @@ These values are passed (with small transformations) when the supervisor starts 
 
 ## Server
 
+- **pi harness** shows the currently selected project folder from **Settings**.
+- **Start pi harness** opens a terminal window and launches the host `pi` command using that selected folder as the working directory. This action is independent from `llama-server`: starting or stopping one does not automatically control the other.
+- `pi` launch requires `pi` and `pi-llama-cpp` to already be installed on the host and available on `PATH`.
 - **Start** spawns `llama-server` with the saved launch profile and bundle `LD_LIBRARY_PATH` behavior.
 - **Stop** sends graceful stop to the child.
 - **Open web UI in new tab** opens `http://<host>:<port>/` in your default browser when the server is **running**, using the **server host** and **port** from Settings. If the bind address is `0.0.0.0`, the link uses `127.0.0.1` so the page loads locally. IPv6 literals are formatted for URLs. This is the upstream `llama-server` web UI, not the panel.
